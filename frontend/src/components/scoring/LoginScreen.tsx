@@ -1,9 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { AuthHeroPanel } from '#/components/AuthHeroPanel'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
+import { Input } from '#/components/ui/input'
+import { Label } from '#/components/ui/label'
 import { getDemoAccounts, type Role } from '#/lib/mock-data'
-import { USE_API } from '#/lib/config'
+import { HAS_ORG_API, USE_API } from '#/lib/config'
 import { useCompStore } from '#/store/comp-store'
 import { Shield, User, Users } from 'lucide-react'
 
@@ -30,10 +32,13 @@ const ROLE_META: Record<
 
 export function LoginScreen() {
   const signInAs = useCompStore((s) => s.signInAs)
+  const signInWithEmployeeCode = useCompStore((s) => s.signInWithEmployeeCode)
   const demoAccounts = useCompStore((s) => s.demoAccounts)
   const isLoading = useCompStore((s) => s.isLoading)
   const error = useCompStore((s) => s.error)
   const loadDemoAccounts = useCompStore((s) => s.loadDemoAccounts)
+
+  const [employeeCode, setEmployeeCode] = useState('')
 
   const accounts = USE_API ? demoAccounts : getDemoAccounts()
 
@@ -42,6 +47,11 @@ export function LoginScreen() {
       void loadDemoAccounts()
     }
   }, [loadDemoAccounts])
+
+  const handleEmployeeCodeSubmit = (event: FormEvent) => {
+    event.preventDefault()
+    void signInWithEmployeeCode(employeeCode)
+  }
 
   return (
     <div className="min-h-[calc(100vh-72px)] bg-white lg:grid lg:grid-cols-[1.15fr_0.85fr]">
@@ -62,9 +72,8 @@ export function LoginScreen() {
               Competency mapping and skill assessment system
             </p>
             <p className="mt-3 text-sm text-muted-foreground">
-              {USE_API
-                ? 'Demo sign-in — pick an account. Backend API with mock auth.'
-                : 'Mock sign-in — pick a demo account. No backend connected.'}
+              Enter your employee code to continue. SSO will supply this
+              automatically later.
             </p>
           </div>
 
@@ -74,7 +83,45 @@ export function LoginScreen() {
             </p>
           ) : null}
 
-          <div className="mt-8 space-y-3">
+          <form className="mt-8 space-y-3" onSubmit={handleEmployeeCodeSubmit}>
+            <div className="space-y-2">
+              <Label htmlFor="employee-code">Employee code</Label>
+              <Input
+                id="employee-code"
+                name="employeeCode"
+                value={employeeCode}
+                onChange={(event) => setEmployeeCode(event.target.value)}
+                placeholder="e.g. E12345"
+                autoComplete="username"
+                disabled={isLoading}
+              />
+              <p className="text-xs text-muted-foreground">
+                If this code is an L1 manager for others, you score that team.
+                Otherwise you only rate yourself.
+                {!HAS_ORG_API
+                  ? ' Set VITE_URL_API and VITE_API_KEY in frontend/.env, then restart Vite.'
+                  : null}
+              </p>
+            </div>
+            <Button
+              type="submit"
+              className="w-full"
+              size="lg"
+              disabled={isLoading || !employeeCode.trim()}
+            >
+              {isLoading ? 'Checking directory…' : 'Continue'}
+            </Button>
+          </form>
+
+          <div className="mt-8 flex items-center gap-3">
+            <div className="h-px flex-1 bg-border" />
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+              Demo accounts
+            </p>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+
+          <div className="mt-4 space-y-3">
             {accounts.map((account) => {
               const meta = ROLE_META[account.role]
               const Icon = meta.icon

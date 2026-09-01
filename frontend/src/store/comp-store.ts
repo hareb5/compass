@@ -10,7 +10,7 @@ import {
 } from '#/lib/mock-data'
 import type { CompetencyId, ScoreMap } from '#/lib/competencies'
 import { isCompleteScores } from '#/lib/competencies'
-import { USE_API } from '#/lib/config'
+import { ORG_EMPLOYEE_CODE_KEY, USE_API } from '#/lib/config'
 import { setDemoUserId } from '#/lib/api'
 import {
   fetchAdminAssessments,
@@ -22,9 +22,13 @@ import {
   submitSelfScores as apiSubmitSelfScores,
   type AdminAssessmentRow,
 } from '#/lib/comp-api'
+import { establishSessionFromEmployeeCode } from '#/lib/org-directory'
+
+type SessionKind = 'none' | 'mock' | 'api' | 'org'
 
 type CompState = {
   useApi: boolean
+  sessionKind: SessionKind
   currentUser: MockUser | null
   reports: MockUser[]
   usersById: Record<string, MockUser>
@@ -38,6 +42,8 @@ type CompState = {
   loadDemoAccounts: () => Promise<void>
   restoreSession: () => Promise<void>
   signInAs: (userId: string) => Promise<void>
+  /** Emp-code sign-in now; same path SSO will use once it yields a code. */
+  signInWithEmployeeCode: (employeeCode: string) => Promise<void>
   signOut: () => void
   submitEmployeeScores: (
     employeeId: string,
@@ -76,10 +82,29 @@ function applyAdminRows(rows: AdminAssessmentRow[]) {
   return { assessments, usersById: indexUsers(users), adminRows: rows }
 }
 
+function getOrgEmployeeCode(): string | null {
+  if (typeof window === 'undefined') return null
+  return sessionStorage.getItem(ORG_EMPLOYEE_CODE_KEY)
+}
+
+function setOrgEmployeeCode(code: string | null) {
+  if (typeof window === 'undefined') return
+  if (code) {
+    sessionStorage.setItem(ORG_EMPLOYEE_CODE_KEY, code)
+  } else {
+    sessionStorage.removeItem(ORG_EMPLOYEE_CODE_KEY)
+  }
+}
+
+function usesLocalScoring(sessionKind: SessionKind, useApi: boolean) {
+  return sessionKind === 'org' || sessionKind === 'mock' || !useApi
+}
+
 export const useCompStore = create<CompState>()(
   persist(
     (set, get) => ({
       useApi: USE_API,
+      sessionKind: 'none',
       currentUser: null,
       reports: [],
       usersById: {},
@@ -107,6 +132,42 @@ export const useCompStore = create<CompState>()(
       },
 
       restoreSession: async () => {
+        const orgCode = getOrgEmployeeCode()
+        if (orgCode) {
+          set({ isLoading: true, error: null })
+          try {
+            const identity = await establishSessionFromEmployeeCode(orgCode)
+            const previous = get().assessments
+            const previousByEmployee = Object.fromEntries(
+              previous.map((record) => [record.employeeId, record]),
+            )
+            const assessments = identity.assessments.map(
+              (record) => previousByEmployee[record.employeeId] ?? record,
+            )
+            set({
+              sessionKind: 'org',
+              currentUser: identity.user,
+              reports: identity.reports,
+              usersById: indexUsers([identity.user, ...identity.reports]),
+              assessments,
+              isLoading: false,
+              error: null,
+            })
+          } catch (error) {
+            setOrgEmployeeCode(null)
+            set({
+              sessionKind: 'none',
+              currentUser: null,
+              isLoading: false,
+              error:
+                error instanceof Error
+                  ? error.message
+                  : 'Failed to restore org session.',
+            })
+          }
+          return
+        }
+
         if (!USE_API) return
         const demoUserId =
           typeof window !== 'undefined'
@@ -120,6 +181,7 @@ export const useCompStore = create<CompState>()(
           const me = await fetchMe()
           const reports = me.reports ?? []
           const next: Partial<CompState> = {
+            sessionKind: 'api',
             currentUser: me,
             reports,
             usersById: indexUsers([me, ...reports]),
@@ -148,6 +210,7 @@ export const useCompStore = create<CompState>()(
           setDemoUserId(null)
           set({
             currentUser: null,
+            sessionKind: 'none',
             isLoading: false,
             error:
               error instanceof Error
@@ -158,12 +221,14 @@ export const useCompStore = create<CompState>()(
       },
 
       signInAs: async (userId) => {
+        setOrgEmployeeCode(null)
         if (!USE_API) {
           const user = getMockUserById(userId)
           if (!user) return
           const reports =
             user.role === 'manager' ? getEmployeesForManager(userId) : []
           set({
+            sessionKind: 'mock',
             currentUser: user,
             reports,
             usersById: indexUsers([user, ...reports]),
@@ -179,6 +244,7 @@ export const useCompStore = create<CompState>()(
           const reports = me.reports ?? []
 
           const next: Partial<CompState> = {
+            sessionKind: 'api',
             currentUser: me,
             reports,
             usersById: indexUsers([me, ...reports]),
@@ -207,15 +273,46 @@ export const useCompStore = create<CompState>()(
           setDemoUserId(null)
           set({
             isLoading: false,
+            sessionKind: 'none',
             error:
               error instanceof Error ? error.message : 'Failed to sign in.',
           })
         }
       },
 
+      signInWithEmployeeCode: async (employeeCode) => {
+        set({ isLoading: true, error: null })
+        try {
+          setDemoUserId(null)
+          const identity = await establishSessionFromEmployeeCode(employeeCode)
+          setOrgEmployeeCode(identity.user.id)
+          set({
+            sessionKind: 'org',
+            currentUser: identity.user,
+            reports: identity.reports,
+            usersById: indexUsers([identity.user, ...identity.reports]),
+            assessments: identity.assessments,
+            isLoading: false,
+            error: null,
+          })
+        } catch (error) {
+          setOrgEmployeeCode(null)
+          set({
+            isLoading: false,
+            sessionKind: 'none',
+            error:
+              error instanceof Error
+                ? error.message
+                : 'Failed to sign in with employee code.',
+          })
+        }
+      },
+
       signOut: () => {
         setDemoUserId(null)
+        setOrgEmployeeCode(null)
         set({
+          sessionKind: 'none',
           currentUser: null,
           reports: [],
           usersById: {},
@@ -227,19 +324,33 @@ export const useCompStore = create<CompState>()(
 
       submitEmployeeScores: async (employeeId, scores) => {
         if (!isCompleteScores(scores)) return false
-        const { currentUser, useApi } = get()
+        const { currentUser, useApi, sessionKind } = get()
         if (!currentUser || currentUser.id !== employeeId) return false
 
-        if (!useApi) {
+        if (usesLocalScoring(sessionKind, useApi)) {
           const { assessments } = get()
-          const next = assessments.map((record) => {
-            if (record.employeeId !== employeeId) return record
-            return {
-              ...record,
-              employeeScores: cloneScores(scores),
-              employeeSubmittedAt: new Date().toISOString(),
-            }
-          })
+          const next = assessments.some(
+            (record) => record.employeeId === employeeId,
+          )
+            ? assessments.map((record) => {
+                if (record.employeeId !== employeeId) return record
+                return {
+                  ...record,
+                  employeeScores: cloneScores(scores),
+                  employeeSubmittedAt: new Date().toISOString(),
+                }
+              })
+            : [
+                ...assessments,
+                {
+                  employeeId,
+                  managerId: currentUser.reportsTo ?? '',
+                  employeeScores: cloneScores(scores),
+                  managerScores: null,
+                  employeeSubmittedAt: new Date().toISOString(),
+                  managerSubmittedAt: null,
+                },
+              ]
           set({ assessments: next })
           return true
         }
@@ -270,24 +381,40 @@ export const useCompStore = create<CompState>()(
 
       submitManagerScores: async (managerId, employeeId, scores) => {
         if (!isCompleteScores(scores)) return false
-        const { currentUser, useApi } = get()
+        const { currentUser, useApi, sessionKind } = get()
         if (!currentUser || currentUser.id !== managerId) return false
 
-        if (!useApi) {
+        if (usesLocalScoring(sessionKind, useApi)) {
           const { assessments } = get()
-          const next = assessments.map((record) => {
-            if (
-              record.employeeId !== employeeId ||
-              record.managerId !== managerId
-            ) {
-              return record
-            }
-            return {
-              ...record,
-              managerScores: cloneScores(scores),
-              managerSubmittedAt: new Date().toISOString(),
-            }
-          })
+          const next = assessments.some(
+            (record) =>
+              record.employeeId === employeeId &&
+              record.managerId === managerId,
+          )
+            ? assessments.map((record) => {
+                if (
+                  record.employeeId !== employeeId ||
+                  record.managerId !== managerId
+                ) {
+                  return record
+                }
+                return {
+                  ...record,
+                  managerScores: cloneScores(scores),
+                  managerSubmittedAt: new Date().toISOString(),
+                }
+              })
+            : [
+                ...assessments,
+                {
+                  employeeId,
+                  managerId,
+                  employeeScores: null,
+                  managerScores: cloneScores(scores),
+                  employeeSubmittedAt: null,
+                  managerSubmittedAt: new Date().toISOString(),
+                },
+              ]
           set({ assessments: next })
           return true
         }
@@ -320,6 +447,27 @@ export const useCompStore = create<CompState>()(
       },
 
       resetMockData: async () => {
+        if (get().sessionKind === 'org') {
+          const code = getOrgEmployeeCode()
+          if (!code) return
+          try {
+            const identity = await establishSessionFromEmployeeCode(code)
+            set({
+              assessments: identity.assessments,
+              reports: identity.reports,
+              usersById: indexUsers([identity.user, ...identity.reports]),
+            })
+          } catch (error) {
+            set({
+              error:
+                error instanceof Error
+                  ? error.message
+                  : 'Failed to reset org data.',
+            })
+          }
+          return
+        }
+
         if (get().useApi) {
           try {
             await resetAdminData()
@@ -351,18 +499,27 @@ export const useCompStore = create<CompState>()(
     {
       name: USE_API ? 'comptool-api-v1' : 'comptool-mock-v1',
       partialize: (state) =>
-        USE_API
-          ? { hasHydrated: state.hasHydrated }
-          : {
+        state.sessionKind === 'org'
+          ? {
               currentUser: state.currentUser,
+              reports: state.reports,
+              usersById: state.usersById,
               assessments: state.assessments,
+              sessionKind: state.sessionKind,
               hasHydrated: state.hasHydrated,
-            },
+            }
+          : USE_API
+            ? { hasHydrated: state.hasHydrated }
+            : {
+                currentUser: state.currentUser,
+                assessments: state.assessments,
+                hasHydrated: state.hasHydrated,
+              },
       onRehydrateStorage: () => async (state) => {
         state?.setHasHydrated(true)
+        await state?.restoreSession()
         if (USE_API) {
           await state?.loadDemoAccounts()
-          await state?.restoreSession()
         }
       },
     },

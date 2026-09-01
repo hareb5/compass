@@ -10,45 +10,34 @@ comptool/
   backend/    Express + MongoDB (port 5020)
 ```
 
-## Quick start (API mode)
+## Quick start
 
-**Backend**
 ```bash
-cd backend
-cp .env.example .env
-npm install
-npm run dev
+# Backend (optional when VITE_USE_API=false)
+cd backend && npm install && npm run dev
+
+# Frontend
+cd frontend && bun install && bun run dev
 ```
 
-Requires MongoDB at `mongodb://127.0.0.1:27017/comptool` (or set `MONGO_URI`).
+Open http://localhost:3020 — enter an **employee code**, or pick a demo account.
 
-**Frontend**
-```bash
-cd frontend
-cp .env.example .env
-bun install
-bun run dev
+### Org directory env (`frontend/.env`)
+
+```
+VITE_USE_API=false
+VITE_URL_API=https://your-org-api/employees
+VITE_API_KEY=your-bearer-token
 ```
 
-Open http://localhost:3020 — pick a demo account.
+Restart Vite after changing env. Lookup uses `employees[]` fields `EMPLOYEE_CODE`, `EMPLOYEE_NAME`, `L1_MANAGER_CODE`, `L1_MANAGER_NAME`:
+- code appears as someone’s `L1_MANAGER_CODE` → **manager** (scores those reports)
+- otherwise → **employee** (self-score only)
 
-## Mock-only mode (no backend)
-
-Set `VITE_USE_API=false` in `frontend/.env` and run the frontend only.
+SSO will later feed the same employee-code path (`signInWithEmployeeCode`).
 
 ## Roles
 
-- **Employee** — self-score 1–5 (40% weight); cannot see manager scores
-- **Manager** — score reports 1–5 (60% weight); cannot see self-scores
+- **Employee** — self-score 1–5 (40%)
+- **Manager** — score reports 1–5 (60%)
 - **Admin** — see both + weighted final
-
-Final = manager avg × 60% + employee avg × 40%
-
-## Auth
-
-- Local demo: `AUTH_DISABLED=true` + `X-Demo-User-Id` header (handled by frontend)
-- Production: Microsoft SSO via same pattern as talent (`AZURE_TENANT_ID`, `AZURE_CLIENT_ID`)
-
-## Org hierarchy
-
-Seeded in Mongo now. `orgHierarchy.syncFromExternal()` is stubbed for a future line-manager API.
