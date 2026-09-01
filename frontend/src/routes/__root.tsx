@@ -14,7 +14,7 @@ export const Route = createRootRoute({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'xp COMPASS',
+        title: 'SOBHA COMPASS',
       },
     ],
     links: [

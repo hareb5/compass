@@ -18,7 +18,7 @@ export function AuthHeroPanel({
   title,
   titleAs = 'h1',
   overlayOpacity = 0.3,
-  brand = 'xp COMPASS',
+  brand = 'SOBHA COMPASS',
 }: AuthHeroPanelProps) {
   const HeadingTag = titleAs
 

@@ -19,17 +19,15 @@ export default function Header() {
         <a href="/" className="flex items-center gap-2 font-semibold no-underline">
           <img
             src="/logo-sobha.png"
-            alt="xp COMPASS"
+            alt="SOBHA COMPASS"
             className="h-10 w-10 object-contain"
           />
           <span>
             <span className="block text-xl font-semibold text-primary sm:text-2xl">
-              xp COMPASS
+              SOBHA COMPASS
             </span>
             <span className="block text-xs font-normal text-muted-foreground">
-              {currentUser
-                ? `${currentUser.name} · ${currentUser.role}`
-                : 'Competency mapping & skill assessment'}
+              Competency mapping & skill assessment
             </span>
           </span>
         </a>

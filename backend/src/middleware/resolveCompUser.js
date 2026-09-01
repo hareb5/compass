@@ -34,7 +34,7 @@ async function resolveCompUser(req, res, next) {
       user = await CompUser.findOne({ email }).populate("managerRef");
       if (!user) {
         return res.status(403).json({
-          message: "User is not registered in xp COMPASS.",
+          message: "User is not registered in SOBHA COMPASS.",
         });
       }
     }

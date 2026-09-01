@@ -61,12 +61,12 @@ export function LoginScreen() {
         <div className="w-full max-w-lg">
           <img
             src="/logo-sobha.png"
-            alt="xp COMPASS"
+            alt="SOBHA COMPASS"
             className="mx-auto mb-4 h-20 w-20 object-contain"
           />
           <div className="text-center">
             <p className="text-2xl font-semibold tracking-tight text-foreground">
-              xp COMPASS
+              SOBHA COMPASS
             </p>
             <p className="mt-2 text-sm font-medium text-muted-foreground">
               Competency mapping and skill assessment system

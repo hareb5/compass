@@ -139,7 +139,7 @@ async function seedDatabase() {
     return;
   }
 
-  console.log("[Seed] Seeding xp COMPASS demo data…");
+  console.log("[Seed] Seeding SOBHA COMPASS demo data…");
 
   const userByExternalId = new Map();
 

@@ -32,7 +32,7 @@ async function startServer() {
     }
 
     app.listen(PORT, () => {
-      console.log(`xp COMPASS API running on port ${PORT}`);
+      console.log(`SOBHA COMPASS API running on port ${PORT}`);
     });
   } catch (error) {
     console.error("Server startup failed:", error.message);

@@ -12,7 +12,7 @@ import {
 import { surveyBackgroundStyle } from '#/lib/survey-constants'
 import { cn } from '#/lib/utils'
 import { setScoreValue, useCompStore } from '#/store/comp-store'
-import { CheckCircle2, Lock, User } from 'lucide-react'
+import { CheckCircle2, User } from 'lucide-react'
 
 export function ManagerScoringScreen() {
   const currentUser = useCompStore((s) => s.currentUser)
@@ -69,7 +69,10 @@ export function ManagerScoringScreen() {
           <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">
             Your team
           </p>
-          <h2 className="mt-2 text-lg font-semibold">Select employee</h2>
+          <h2 className="mt-2 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+            {currentUser.name}
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">Select employee</p>
           <div className="mt-4 space-y-2">
             {reports.map((employee) => {
               const record = assessments.find(
@@ -116,14 +119,11 @@ export function ManagerScoringScreen() {
               <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">
                 Manager assessment
               </p>
-              <h1 className="mt-2 text-2xl font-semibold text-foreground">
-                {selectedEmployee
-                  ? `Score ${selectedEmployee.name}`
-                  : 'Select an employee'}
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                {selectedEmployee ? selectedEmployee.name : 'Select an employee'}
               </h1>
-              <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-                Employee self-scores stay hidden. Your score contributes 60% of
-                the final result.
+              <p className="mt-2 text-sm text-muted-foreground">
+                Score this employee on 5 competencies
               </p>
             </div>
             <Badge variant={alreadySubmitted ? 'default' : 'secondary'}>
@@ -131,17 +131,13 @@ export function ManagerScoringScreen() {
             </Badge>
           </div>
 
-          <div className="mt-5 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-background/70 px-4 py-3 text-sm">
-            <Lock className="size-4 text-primary" />
-            <span className="text-muted-foreground">
-              Employee self-scores are hidden from you.
-            </span>
-            {managerAverage != null ? (
-              <span className="ml-auto font-semibold tabular-nums text-foreground">
+          {managerAverage != null ? (
+            <div className="mt-5 rounded-lg border border-border bg-background/70 px-4 py-3 text-sm">
+              <span className="font-semibold tabular-nums text-foreground">
                 Your average: {formatScore(managerAverage)}
               </span>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
 
           {selectedEmployee ? (
             <>

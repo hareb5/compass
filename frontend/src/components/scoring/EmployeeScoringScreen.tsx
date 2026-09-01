@@ -11,7 +11,7 @@ import {
 } from '#/lib/competencies'
 import { surveyBackgroundStyle } from '#/lib/survey-constants'
 import { setScoreValue, useCompStore } from '#/store/comp-store'
-import { CheckCircle2, Lock } from 'lucide-react'
+import { CheckCircle2 } from 'lucide-react'
 
 export function EmployeeScoringScreen() {
   const currentUser = useCompStore((s) => s.currentUser)
@@ -51,12 +51,11 @@ export function EmployeeScoringScreen() {
               <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">
                 Self assessment
               </p>
-              <h1 className="mt-2 text-2xl font-semibold text-foreground">
-                Score yourself on 5 competencies
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                {currentUser.name}
               </h1>
-              <p className="mt-2 max-w-xl text-sm text-muted-foreground">
-                Your scores are private from your manager. Your self-score
-                contributes 40% of the final result.
+              <p className="mt-2 text-sm text-muted-foreground">
+                Score yourself on 5 competencies
               </p>
             </div>
             <Badge variant={alreadySubmitted ? 'default' : 'secondary'}>
@@ -64,17 +63,13 @@ export function EmployeeScoringScreen() {
             </Badge>
           </div>
 
-          <div className="mt-5 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-background/70 px-4 py-3 text-sm">
-            <Lock className="size-4 text-primary" />
-            <span className="text-muted-foreground">
-              Manager scores are hidden from you.
-            </span>
-            {selfAverage != null ? (
-              <span className="ml-auto font-semibold tabular-nums text-foreground">
+          {selfAverage != null ? (
+            <div className="mt-5 rounded-lg border border-border bg-background/70 px-4 py-3 text-sm">
+              <span className="font-semibold tabular-nums text-foreground">
                 Your average: {formatScore(selfAverage)}
               </span>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
 
           <div className="mt-6">
             <ScorePicker
@@ -87,11 +82,7 @@ export function EmployeeScoringScreen() {
           </div>
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
-            <Button
-              size="lg"
-              disabled={!canSubmit}
-              onClick={handleSubmit}
-            >
+            <Button size="lg" disabled={!canSubmit} onClick={handleSubmit}>
               Submit self scores
             </Button>
             {alreadySubmitted || saved ? (

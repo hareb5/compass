@@ -6,6 +6,7 @@ export type OrgEmployee = {
   EMPLOYEE_NAME: string
   L1_MANAGER_CODE: string
   L1_MANAGER_NAME: string
+  EmpStatus?: string
   [key: string]: unknown
 }
 
@@ -17,6 +18,10 @@ export type OrgIdentity = {
 
 function normalizeCode(value: unknown): string {
   return String(value ?? '').trim()
+}
+
+function isActiveEmployee(row: OrgEmployee): boolean {
+  return normalizeCode(row.EmpStatus).toLowerCase() === 'active'
 }
 
 function toPerson(
@@ -38,7 +43,7 @@ function toPerson(
 
 /**
  * Resolve role from an employee code against the org directory.
- * - Appears as anyone's L1_MANAGER_CODE → manager (score those reports)
+ * - Appears as anyone's L1_MANAGER_CODE (active reports) → manager
  * - Otherwise → employee (self-score only)
  *
  * Same entry point SSO will call once it provides the employee code.
@@ -56,8 +61,10 @@ export function resolveOrgIdentity(
     (row) => normalizeCode(row.EMPLOYEE_CODE) === code,
   )
 
+  // Managers only see Active reports; Inactive are hidden from the team list.
   const reportRows = employees.filter(
-    (row) => normalizeCode(row.L1_MANAGER_CODE) === code,
+    (row) =>
+      normalizeCode(row.L1_MANAGER_CODE) === code && isActiveEmployee(row),
   )
 
   if (reportRows.length > 0) {

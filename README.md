@@ -1,4 +1,4 @@
-# xp COMPASS
+# SOBHA COMPASS
 
 Competency mapping and skill assessment system — frontend + backend.
 
@@ -30,8 +30,8 @@ VITE_URL_API=https://your-org-api/employees
 VITE_API_KEY=your-bearer-token
 ```
 
-Restart Vite after changing env. Lookup uses `employees[]` fields `EMPLOYEE_CODE`, `EMPLOYEE_NAME`, `L1_MANAGER_CODE`, `L1_MANAGER_NAME`:
-- code appears as someone’s `L1_MANAGER_CODE` → **manager** (scores those reports)
+Restart Vite after changing env. Lookup uses `employees[]` fields `EMPLOYEE_CODE`, `EMPLOYEE_NAME`, `L1_MANAGER_CODE`, `L1_MANAGER_NAME`, `EmpStatus`:
+- code appears as someone’s `L1_MANAGER_CODE` → **manager** (scores **Active** reports only; `Inactive` hidden)
 - otherwise → **employee** (self-score only)
 
 SSO will later feed the same employee-code path (`signInWithEmployeeCode`).
