@@ -11,7 +11,7 @@ import {
 import type { CompetencyId, ScoreMap } from '#/lib/competencies'
 import { isCompleteScores } from '#/lib/competencies'
 import { ORG_EMPLOYEE_CODE_KEY, USE_API } from '#/lib/config'
-import { setDemoUserId } from '#/lib/api'
+import { setDemoUserId, setSsoAccessToken } from '#/lib/api'
 import {
   fetchAdminAssessments,
   fetchDemoAccounts,
@@ -310,6 +310,7 @@ export const useCompStore = create<CompState>()(
 
       signOut: () => {
         setDemoUserId(null)
+        setSsoAccessToken(null)
         setOrgEmployeeCode(null)
         set({
           sessionKind: 'none',

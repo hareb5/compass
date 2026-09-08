@@ -17,7 +17,7 @@ function buildAuthPanelStyle(overlayOpacity: number) {
 export function AuthHeroPanel({
   title,
   titleAs = 'h1',
-  overlayOpacity = 0.3,
+  overlayOpacity = 0.62,
   brand = 'SOBHA COMPASS',
 }: AuthHeroPanelProps) {
   const HeadingTag = titleAs
@@ -28,10 +28,10 @@ export function AuthHeroPanel({
       style={buildAuthPanelStyle(overlayOpacity)}
     >
       <div className="max-w-md">
-        <p className="text-3xl font-semibold tracking-tight text-primary">
+        <p className="text-3xl font-semibold tracking-tight text-white drop-shadow">
           {brand}
         </p>
-        <HeadingTag className="mt-3 text-2xl font-semibold tracking-tight sm:text-2xl">
+        <HeadingTag className="mt-3 text-2xl font-semibold tracking-tight text-white drop-shadow sm:text-2xl">
           {title}
         </HeadingTag>
       </div>

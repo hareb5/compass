@@ -1,4 +1,7 @@
-import { DEMO_USER_KEY } from '#/lib/config'
+import {
+  DEMO_USER_KEY,
+  SSO_ACCESS_TOKEN_KEY,
+} from '#/lib/config'
 
 export class ApiError extends Error {
   status: number
@@ -24,6 +27,20 @@ export function setDemoUserId(userId: string | null) {
   }
 }
 
+export function getSsoAccessToken(): string | null {
+  if (typeof window === 'undefined') return null
+  return sessionStorage.getItem(SSO_ACCESS_TOKEN_KEY)
+}
+
+export function setSsoAccessToken(token: string | null) {
+  if (typeof window === 'undefined') return
+  if (token) {
+    sessionStorage.setItem(SSO_ACCESS_TOKEN_KEY, token)
+  } else {
+    sessionStorage.removeItem(SSO_ACCESS_TOKEN_KEY)
+  }
+}
+
 export async function apiFetch<T>(
   path: string,
   options: RequestInit = {},
@@ -31,6 +48,11 @@ export async function apiFetch<T>(
   const headers = new Headers(options.headers)
   if (!headers.has('Content-Type') && options.body) {
     headers.set('Content-Type', 'application/json')
+  }
+
+  const ssoToken = getSsoAccessToken()
+  if (ssoToken && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${ssoToken}`)
   }
 
   const demoUserId = getDemoUserId()

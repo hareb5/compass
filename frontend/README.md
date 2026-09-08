@@ -1,19 +1,13 @@
 # CompTool Frontend
 
-## Run (with backend)
-
 ```bash
-cp .env.example .env   # VITE_USE_API=true
+cp .env.example .env
 bun install
 bun run dev
 ```
 
-Start the backend first (see `../backend/README.md`). Open http://localhost:3020
+Open http://localhost:3020
 
-## Run (mock only, no backend)
-
-Set `VITE_USE_API=false` in `.env` and run `bun run dev`.
-
-## API mode
-
-Proxies `/api` → `http://localhost:5020`. Demo sign-in sends `X-Demo-User-Id` header when `AUTH_DISABLED=true` on the backend.
+- `VITE_USE_API=true` proxies `/api` → `http://localhost:5020` and uses backend employee-code lookup.
+- `VITE_SHOW_DEMO=true` shows demo accounts (keep off for launch).
+- `VITE_USE_API=true` is **not** Microsoft SSO. SSO needs Azure env on the backend plus MSAL on this app.

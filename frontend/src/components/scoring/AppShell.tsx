@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { AdminDashboard } from '#/components/admin/AdminDashboard'
 import { EmployeeScoringScreen } from '#/components/scoring/EmployeeScoringScreen'
 import { LoginScreen } from '#/components/scoring/LoginScreen'
@@ -7,6 +8,16 @@ import { useCompStore } from '#/store/comp-store'
 export function AppShell() {
   const currentUser = useCompStore((s) => s.currentUser)
   const hasHydrated = useCompStore((s) => s.hasHydrated)
+
+  useEffect(() => {
+    if (hasHydrated) return
+    const timeoutId = window.setTimeout(() => {
+      if (!useCompStore.getState().hasHydrated) {
+        useCompStore.getState().setHasHydrated(true)
+      }
+    }, 2500)
+    return () => window.clearTimeout(timeoutId)
+  }, [hasHydrated])
 
   if (!hasHydrated) {
     return (

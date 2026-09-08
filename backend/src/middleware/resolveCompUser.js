@@ -2,6 +2,7 @@ const azureAuth = require("../config/azureAuth");
 const CompUser = require("../models/CompUser");
 const { USER_ROLES } = require("../constants/userRoles");
 const { serializeUser } = require("../services/orgHierarchy");
+const { sendError } = require("../utils/httpError");
 
 async function resolveCompUser(req, res, next) {
   try {
@@ -42,10 +43,7 @@ async function resolveCompUser(req, res, next) {
     req.compUser = user;
     return next();
   } catch (error) {
-    return res.status(500).json({
-      message: "Failed to resolve user.",
-      error: error.message,
-    });
+    return sendError(res, 500, "Failed to resolve user.", error);
   }
 }
 

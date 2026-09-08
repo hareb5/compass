@@ -86,7 +86,7 @@ export function ManagerScoringScreen() {
                   type="button"
                   onClick={() => setSelectedEmployeeId(employee.id)}
                   className={cn(
-                    'flex w-full items-start gap-3 rounded-lg border px-3 py-3 text-left transition',
+                    'flex min-h-11 w-full items-start gap-3 rounded-lg border px-3 py-3 text-left transition',
                     selected
                       ? 'border-primary bg-primary/5'
                       : 'border-border bg-background/70 hover:border-primary/30',

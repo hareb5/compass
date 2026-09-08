@@ -1,4 +1,6 @@
 import type { AssessmentRecord, MockUser, Role } from '#/lib/mock-data'
+import { USE_API } from '#/lib/config'
+import { ApiError, apiFetch } from '#/lib/api'
 
 /** Raw row from the HR / org employees API. */
 export type OrgEmployee = {
@@ -61,7 +63,6 @@ export function resolveOrgIdentity(
     (row) => normalizeCode(row.EMPLOYEE_CODE) === code,
   )
 
-  // Managers only see Active reports; Inactive are hidden from the team list.
   const reportRows = employees.filter(
     (row) =>
       normalizeCode(row.L1_MANAGER_CODE) === code && isActiveEmployee(row),
@@ -131,48 +132,49 @@ function parseEmployeesPayload(payload: unknown): OrgEmployee[] {
 }
 
 /**
- * Fetch org employees. Prefer same-origin `/org-api/employees` (Vite proxy
- * attaches the Bearer token). Falls back to direct VITE_URL_API if set.
+ * Dev-only: same-origin Vite proxy attaches the org API Bearer token
+ * on the server. The key must never be referenced in client code.
  */
-export async function fetchOrgEmployees(): Promise<OrgEmployee[]> {
-  const directUrl = import.meta.env.VITE_URL_API?.trim()
-  const apiKey = import.meta.env.VITE_API_KEY?.trim()
-
-  const tryProxy = async () => {
-    const response = await fetch('/org-api/employees')
-    if (!response.ok) {
-      throw new Error(`Org API failed (${response.status})`)
-    }
-    return parseEmployeesPayload(await response.json())
+async function fetchOrgEmployeesViaProxy(): Promise<OrgEmployee[]> {
+  const response = await fetch('/org-api/employees')
+  if (!response.ok) {
+    throw new Error(`Org API failed (${response.status})`)
   }
 
-  const tryDirect = async () => {
-    if (!directUrl) {
-      throw new Error(
-        'VITE_URL_API is not set. Add it to frontend/.env and restart Vite.',
-      )
-    }
-    const headers = new Headers()
-    if (apiKey) {
-      headers.set('Authorization', `Bearer ${apiKey}`)
-    }
-    const response = await fetch(directUrl, { headers })
-    if (!response.ok) {
-      throw new Error(`Org API failed (${response.status})`)
-    }
-    return parseEmployeesPayload(await response.json())
+  const payload = await response.json().catch(() => null)
+  if (payload == null) {
+    throw new Error(
+      'Could not reach the org directory. Check ORG_API_URL on the server and restart.',
+    )
   }
 
-  try {
-    return await tryProxy()
-  } catch {
-    return tryDirect()
-  }
+  return parseEmployeesPayload(payload)
 }
 
+/**
+ * Fetch org identity for an employee code.
+ * Production (`VITE_USE_API=true`) uses the backend so the org API key
+ * stays on the server. Local mock mode uses the Vite proxy.
+ */
 export async function establishSessionFromEmployeeCode(
   employeeCode: string,
 ): Promise<OrgIdentity> {
-  const employees = await fetchOrgEmployees()
+  if (USE_API) {
+    try {
+      return await apiFetch<OrgIdentity>('/api/session/employee-code', {
+        method: 'POST',
+        body: JSON.stringify({ employeeCode }),
+      })
+    } catch (error) {
+      if (error instanceof ApiError) {
+        const shouldFallback = error.status === 502 || error.status === 503
+        if (!shouldFallback) {
+          throw error
+        }
+      }
+    }
+  }
+
+  const employees = await fetchOrgEmployeesViaProxy()
   return resolveOrgIdentity(employees, employeeCode)
 }

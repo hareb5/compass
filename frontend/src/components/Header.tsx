@@ -15,23 +15,26 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background px-4">
-      <nav className="mx-auto flex h-[72px] w-full max-w-[1400px] items-center justify-between">
-        <a href="/" className="flex items-center gap-2 font-semibold no-underline">
+      <nav className="mx-auto flex h-[72px] w-full max-w-[1400px] items-center justify-between gap-3">
+        <Link
+          to="/"
+          className="flex min-w-0 items-center gap-2 font-semibold no-underline"
+        >
           <img
             src="/logo-sobha.png"
             alt="SOBHA COMPASS"
-            className="h-10 w-10 object-contain"
+            className="h-10 w-10 shrink-0 object-contain"
           />
-          <span>
-            <span className="block text-xl font-semibold text-primary sm:text-2xl">
+          <span className="min-w-0">
+            <span className="block text-lg font-semibold leading-tight text-primary sm:text-2xl">
               SOBHA COMPASS
             </span>
-            <span className="block text-xs font-normal text-muted-foreground">
+            <span className="hidden text-xs font-normal text-muted-foreground sm:block">
               Competency mapping & skill assessment
             </span>
           </span>
-        </a>
-        <div className="flex items-center gap-2">
+        </Link>
+        <div className="flex shrink-0 items-center gap-2">
           {isAdmin ? (
             <>
               {!isAdminRoute ? (

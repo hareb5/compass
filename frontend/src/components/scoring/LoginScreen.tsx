@@ -5,7 +5,7 @@ import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { getDemoAccounts, type Role } from '#/lib/mock-data'
-import { HAS_ORG_API, USE_API } from '#/lib/config'
+import { SHOW_DEMO, USE_API } from '#/lib/config'
 import { useCompStore } from '#/store/comp-store'
 import { Shield, User, Users } from 'lucide-react'
 
@@ -39,17 +39,19 @@ export function LoginScreen() {
   const loadDemoAccounts = useCompStore((s) => s.loadDemoAccounts)
 
   const [employeeCode, setEmployeeCode] = useState('')
+  const [honeypot, setHoneypot] = useState('')
 
   const accounts = USE_API ? demoAccounts : getDemoAccounts()
 
   useEffect(() => {
-    if (USE_API) {
+    if (USE_API && SHOW_DEMO) {
       void loadDemoAccounts()
     }
   }, [loadDemoAccounts])
 
   const handleEmployeeCodeSubmit = (event: FormEvent) => {
     event.preventDefault()
+    if (honeypot.trim()) return
     void signInWithEmployeeCode(employeeCode)
   }
 
@@ -72,18 +74,31 @@ export function LoginScreen() {
               Competency mapping and skill assessment system
             </p>
             <p className="mt-3 text-sm text-muted-foreground">
-              Enter your employee code to continue. SSO will supply this
-              automatically later.
+              Enter your employee code to continue.
             </p>
           </div>
 
           {error ? (
-            <p className="mt-6 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            <p
+              className="mt-6 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+              role="alert"
+            >
               {error}
             </p>
           ) : null}
 
-          <form className="mt-8 space-y-3" onSubmit={handleEmployeeCodeSubmit}>
+          <form className="relative mt-8 space-y-3" onSubmit={handleEmployeeCodeSubmit}>
+            <div hidden aria-hidden="true">
+              <label htmlFor="company-website">Company website</label>
+              <input
+                id="company-website"
+                name="companyWebsite"
+                tabIndex={-1}
+                autoComplete="off"
+                value={honeypot}
+                onChange={(event) => setHoneypot(event.target.value)}
+              />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="employee-code">Employee code</Label>
               <Input
@@ -93,19 +108,18 @@ export function LoginScreen() {
                 onChange={(event) => setEmployeeCode(event.target.value)}
                 placeholder="e.g. E12345"
                 autoComplete="username"
+                inputMode="text"
+                maxLength={32}
                 disabled={isLoading}
               />
               <p className="text-xs text-muted-foreground">
                 If this code is an L1 manager for others, you score that team.
                 Otherwise you only rate yourself.
-                {!HAS_ORG_API
-                  ? ' Set VITE_URL_API and VITE_API_KEY in frontend/.env, then restart Vite.'
-                  : null}
               </p>
             </div>
             <Button
               type="submit"
-              className="w-full"
+              className="w-full min-h-11"
               size="lg"
               disabled={isLoading || !employeeCode.trim()}
             >
@@ -113,56 +127,56 @@ export function LoginScreen() {
             </Button>
           </form>
 
-          <div className="mt-8 flex items-center gap-3">
-            <div className="h-px flex-1 bg-border" />
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-              Demo accounts
-            </p>
-            <div className="h-px flex-1 bg-border" />
-          </div>
+          {SHOW_DEMO ? (
+            <>
+              <div className="mt-8 flex items-center gap-3">
+                <div className="h-px flex-1 bg-border" />
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                  Demo accounts
+                </p>
+                <div className="h-px flex-1 bg-border" />
+              </div>
 
-          <div className="mt-4 space-y-3">
-            {accounts.map((account) => {
-              const meta = ROLE_META[account.role]
-              const Icon = meta.icon
-              return (
-                <button
-                  key={account.id}
-                  type="button"
-                  disabled={isLoading}
-                  onClick={() => void signInAs(account.id)}
-                  className="flex w-full items-start gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-sm transition hover:border-primary/40 hover:bg-accent/40 disabled:opacity-60"
-                >
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <Icon className="size-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-semibold text-foreground">
-                        {account.name}
-                      </p>
-                      <Badge variant="secondary">{meta.label}</Badge>
-                    </div>
-                    <p className="mt-0.5 truncate text-sm text-muted-foreground">
-                      {account.title} · {account.department}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {meta.hint}
-                    </p>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
+              <div className="mt-4 space-y-3">
+                {accounts.map((account) => {
+                  const meta = ROLE_META[account.role]
+                  const Icon = meta.icon
+                  return (
+                    <button
+                      key={account.id}
+                      type="button"
+                      disabled={isLoading}
+                      onClick={() => void signInAs(account.id)}
+                      className="flex min-h-11 w-full items-start gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-sm transition hover:border-primary/40 hover:bg-accent/40 disabled:opacity-60"
+                    >
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <Icon className="size-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-semibold text-foreground">
+                            {account.name}
+                          </p>
+                          <Badge variant="secondary">{meta.label}</Badge>
+                        </div>
+                        <p className="mt-0.5 truncate text-sm text-muted-foreground">
+                          {account.title} · {account.department}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {meta.hint}
+                        </p>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          ) : null}
 
           <p className="mt-6 text-center text-xs text-muted-foreground">
             Manager and employee scores stay private from each other. Admin sees
             everything.
           </p>
-
-          <Button className="mt-4 w-full" size="lg" disabled>
-            Microsoft SSO (coming later)
-          </Button>
         </div>
       </section>
     </div>

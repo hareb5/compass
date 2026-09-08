@@ -42,7 +42,7 @@ export function ScorePicker({ scores, onChange, disabled }: ScorePickerProps) {
                     variant={selected ? 'default' : 'outline'}
                     disabled={disabled}
                     className={cn(
-                      'min-w-10 tabular-nums',
+                      'min-h-11 min-w-11 tabular-nums',
                       selected && 'shadow-sm',
                     )}
                     onClick={() => onChange(competency.id, option)}

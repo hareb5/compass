@@ -23,6 +23,7 @@ const {
   stripForManager,
   serializeAdminAssessment,
 } = require("../services/assessmentService");
+const { sendError } = require("../utils/httpError");
 
 const router = express.Router();
 
@@ -42,10 +43,7 @@ router.get("/demo/accounts", async (_req, res) => {
       accounts: users.map(serializeUser),
     });
   } catch (error) {
-    return res.status(500).json({
-      message: "Failed to load demo accounts.",
-      error: error.message,
-    });
+    return sendError(res, 500, "Failed to load demo accounts.", error);
   }
 });
 
@@ -60,10 +58,7 @@ router.get("/me", resolveCompUser, async (req, res) => {
 
     return res.json(attachMePayload(user, reports));
   } catch (error) {
-    return res.status(500).json({
-      message: "Failed to load profile.",
-      error: error.message,
-    });
+    return sendError(res, 500, "Failed to load profile.", error);
   }
 });
 
@@ -117,10 +112,7 @@ router.get("/assessments/mine", resolveCompUser, async (req, res) => {
       message: "Only employees and managers can access assessments.",
     });
   } catch (error) {
-    return res.status(500).json({
-      message: "Failed to load assessments.",
-      error: error.message,
-    });
+    return sendError(res, 500, "Failed to load assessments.", error);
   }
 });
 
@@ -170,10 +162,7 @@ router.post(
         assessment: stripForEmployee(base),
       });
     } catch (error) {
-      return res.status(500).json({
-        message: "Failed to submit self scores.",
-        error: error.message,
-      });
+      return sendError(res, 500, "Failed to submit self scores.", error);
     }
   },
 );
@@ -234,10 +223,7 @@ router.post(
         assessment: stripForManager(base),
       });
     } catch (error) {
-      return res.status(500).json({
-        message: "Failed to submit manager scores.",
-        error: error.message,
-      });
+      return sendError(res, 500, "Failed to submit manager scores.", error);
     }
   },
 );
@@ -260,10 +246,7 @@ router.get(
         assessments: assessments.map(serializeAdminAssessment),
       });
     } catch (error) {
-      return res.status(500).json({
-        message: "Failed to load admin assessments.",
-        error: error.message,
-      });
+      return sendError(res, 500, "Failed to load admin assessments.", error);
     }
   },
 );
@@ -283,10 +266,7 @@ router.post(
       await resetToSeed();
       return res.json({ message: "Database reset to seed data." });
     } catch (error) {
-      return res.status(500).json({
-        message: "Failed to reset database.",
-        error: error.message,
-      });
+      return sendError(res, 500, "Failed to reset database.", error);
     }
   },
 );

@@ -5,10 +5,18 @@ import tailwindcss from '@tailwindcss/vite'
 
 const LOCAL_BACKEND_ORIGIN = 'http://localhost:5020'
 
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  'X-Robots-Tag': 'noindex, nofollow',
+}
+
 function buildProxy(env: Record<string, string>): Record<string, ProxyOptions> {
   const useApi = env.VITE_USE_API === 'true' || env.VITE_USE_API === '1'
-  const orgApiUrl = env.VITE_URL_API?.trim()
-  const orgApiKey = env.VITE_API_KEY?.trim()
+  const orgApiUrl = (env.ORG_API_URL || env.VITE_URL_API)?.trim()
+  const orgApiKey = (env.ORG_API_KEY || env.VITE_API_KEY)?.trim()
 
   const proxy: Record<string, ProxyOptions> = {}
 
@@ -34,7 +42,7 @@ function buildProxy(env: Record<string, string>): Record<string, ProxyOptions> {
         },
       }
     } catch {
-      // Invalid VITE_URL_API — skip org proxy
+      // Invalid org API URL — skip org proxy
     }
   }
 
@@ -50,12 +58,14 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
       port: 3020,
       strictPort: true,
+      headers: SECURITY_HEADERS,
       proxy: Object.keys(proxy).length ? proxy : undefined,
     },
     preview: {
       host: '0.0.0.0',
       port: 3020,
       strictPort: true,
+      headers: SECURITY_HEADERS,
       proxy: Object.keys(proxy).length ? proxy : undefined,
     },
     resolve: { tsconfigPaths: true },

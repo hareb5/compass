@@ -6,9 +6,8 @@ dist-ssr
 *.local
 .env
 .env.local
-.env.example
 .env.production
-.env.production.local.example
+.env.production.local
 .nitro
 .tanstack
 .wrangler
