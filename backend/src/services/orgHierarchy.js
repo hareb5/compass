@@ -2,6 +2,12 @@ const CompUser = require("../models/CompUser");
 
 function serializeUser(user) {
   if (!user) return null;
+  const managerExternalId =
+    user.managerRef &&
+    typeof user.managerRef === "object" &&
+    user.managerRef.externalId
+      ? user.managerRef.externalId
+      : undefined;
   return {
     id: user.externalId,
     name: user.name,
@@ -9,7 +15,7 @@ function serializeUser(user) {
     title: user.title,
     department: user.department,
     role: user.role,
-    reportsTo: user.managerRef?.externalId ?? undefined,
+    reportsTo: managerExternalId,
   };
 }
 
@@ -28,7 +34,7 @@ async function getManagerForExternalId(employeeExternalId) {
 }
 
 async function getReportsFor(managerRef) {
-  return CompUser.find({ managerRef }).sort({ name: 1 });
+  return CompUser.find({ managerRef }).populate("managerRef").sort({ name: 1 });
 }
 
 async function getReportsForExternalId(managerExternalId) {
@@ -37,9 +43,11 @@ async function getReportsForExternalId(managerExternalId) {
   return getReportsFor(manager._id);
 }
 
-/** Stub for future external line-manager API sync. */
+/** Org graph is persisted on employee-code / SSO provision via orgSync. */
 async function syncFromExternal(_payload) {
-  throw new Error("External org sync is not implemented yet.");
+  throw new Error(
+    "Bulk org sync is not used. Users and teams are upserted on sign-in.",
+  );
 }
 
 module.exports = {

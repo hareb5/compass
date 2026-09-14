@@ -40,7 +40,7 @@ export function AppShell() {
       return <EmployeeScoringScreen />
     default: {
       const _exhaustive: never = currentUser.role
-      return _exhaustive
+      throw new Error(`Unhandled role: ${_exhaustive}`)
     }
   }
 }

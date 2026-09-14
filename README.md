@@ -28,16 +28,11 @@ Open http://localhost:3020 and click a demo account. Do not start Mongo or the b
 
 ---
 
-## 2. Production — SSO + Mongo (not finished)
+## 2. API + Mongo (employee code now, Microsoft button later)
 
-Backend already checks a Microsoft token and loads the user from Mongo by **email**. The frontend does **not** yet open the Microsoft sign-in popup. Env keys alone will not make the button work.
+Set `VITE_USE_API=true` and `AUTH_DISABLED=false`. People sign in with employee code. The API loads the org directory, saves boss/team links in Mongo, and stores scores so admin can see them.
 
-### One-time setup (Azure + server)
-
-1. Create an App Registration in Azure AD (same tenant as company Microsoft login).
-2. Add the production URL as a redirect URI (single-page / SPA).
-3. Put real people in Mongo (`email` must match their Microsoft email, plus `employeeCode`, `role`, manager link).
-4. On the **server** (not in `frontend/.env` for secrets):
+Microsoft SSO keys can sit in backend env now; the login **button** is still not in the frontend. When that is added, the same API will accept the Microsoft token and map email → employee code.
 
 **Frontend build env**
 
@@ -54,6 +49,10 @@ NODE_ENV=production
 MONGO_URI=...
 CORS_ORIGIN=https://your-domain
 AUTH_DISABLED=false
+SESSION_SECRET=...
+ORG_API_URL=...
+ORG_API_KEY=...
+ADMIN_EMPLOYEE_CODES=...
 AZURE_TENANT_ID=...
 AZURE_CLIENT_ID=...
 AZURE_ALLOWED_EMAIL_DOMAINS=sobha.com
@@ -61,15 +60,7 @@ REQUIRE_HTTPS=true
 TRUST_PROXY=true
 ```
 
-5. Host frontend as HTTPS static files, backend as the Node API, proxy `/api` to the backend.
-
-### Still to build in this repo (then deploy that same code)
-
-- Microsoft sign-in button (MSAL).
-- After login, send the Microsoft token on `/api` calls (the API already expects that).
-- After login works, map the Microsoft user to `employeeCode` if email is not enough.
-
-Do this work in the project once, then deploy. You do not repeat token steps on the server.
+Host frontend as HTTPS static files, backend as the Node API, proxy `/api` to the backend.
 
 ---
 

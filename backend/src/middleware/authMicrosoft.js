@@ -1,4 +1,5 @@
 const azureAuth = require("../config/azureAuth");
+const { tryVerifySessionToken } = require("../services/sessionToken");
 
 let joseModulePromise;
 
@@ -48,6 +49,18 @@ function extractEmail(payload) {
 
 function extractName(payload) {
   const raw = payload.name || payload.given_name || "";
+  return typeof raw === "string" ? raw.trim() : "";
+}
+
+function extractEmployeeCode(payload) {
+  if (!payload || typeof payload !== "object") return "";
+  const raw =
+    payload.employeeid ||
+    payload.employee_id ||
+    payload.employeeCode ||
+    payload.extension_EmployeeID ||
+    payload.extension_employeeid ||
+    "";
   return typeof raw === "string" ? raw.trim() : "";
 }
 
@@ -134,19 +147,28 @@ function readBearerToken(req) {
 
 async function requireMicrosoftAuth(req, res, next) {
   if (azureAuth.authDisabled) {
+    const token = readBearerToken(req);
+    if (token) {
+      try {
+        const sessionAuth = await tryVerifySessionToken(token);
+        if (sessionAuth) {
+          req.auth = { ...sessionAuth, bypassed: true };
+          return next();
+        }
+      } catch {
+        // Fall through to demo impersonation.
+      }
+    }
+
     req.auth = {
       oid: "",
       email: "",
       name: "",
+      employeeCode: "",
+      source: "demo",
       bypassed: true,
     };
     return next();
-  }
-
-  if (!azureAuth.isConfigured) {
-    return res.status(503).json({
-      message: "Authentication is not configured on the server.",
-    });
   }
 
   const token = readBearerToken(req);
@@ -157,7 +179,25 @@ async function requireMicrosoftAuth(req, res, next) {
   }
 
   try {
-    req.auth = await verifyBearerToken(token);
+    const sessionAuth = await tryVerifySessionToken(token);
+    if (sessionAuth) {
+      req.auth = sessionAuth;
+      return next();
+    }
+
+    if (!azureAuth.isConfigured) {
+      return res.status(401).json({
+        message: "Invalid or expired session. Sign in again.",
+      });
+    }
+
+    const microsoftAuth = await verifyBearerToken(token);
+    req.auth = {
+      ...microsoftAuth,
+      employeeCode: extractEmployeeCode(microsoftAuth.claims),
+      source: "microsoft",
+      bypassed: false,
+    };
     return next();
   } catch (error) {
     return res.status(401).json({
@@ -169,4 +209,5 @@ async function requireMicrosoftAuth(req, res, next) {
 module.exports = {
   requireMicrosoftAuth,
   verifyBearerToken,
+  extractEmployeeCode,
 };

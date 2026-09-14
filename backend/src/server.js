@@ -30,11 +30,13 @@ async function startServer() {
         );
       }
     } else if (!azureAuth.isConfigured) {
-      console.warn(
-        "[Auth] SSO is off. Set AZURE_TENANT_ID and AZURE_CLIENT_ID, keep AUTH_DISABLED unset, then send a Microsoft Bearer token from the frontend.",
+      console.log(
+        "[Auth] Microsoft SSO keys are optional until MSAL is wired. Employee-code sessions are active.",
       );
     } else {
-      console.log("[Auth] Microsoft JWT verification configured.");
+      console.log(
+        "[Auth] Microsoft JWT verification configured. Employee-code sessions still work until MSAL is added.",
+      );
     }
 
     if (orgApi.isConfigured) {
@@ -43,6 +45,18 @@ async function startServer() {
       console.warn(
         "[Org] Set ORG_API_URL (and ORG_API_KEY) for employee-code sign-in.",
       );
+    }
+
+    if (!process.env.SESSION_SECRET?.trim() && process.env.AUTH_DISABLED !== "true") {
+      if (process.env.NODE_ENV === "production" && !azureAuth.clientId) {
+        console.warn(
+          "[Auth] Set SESSION_SECRET (or AZURE_CLIENT_ID) so employee-code sessions can be signed.",
+        );
+      } else if (process.env.NODE_ENV !== "production") {
+        console.warn(
+          "[Auth] SESSION_SECRET is unset — using the development session secret.",
+        );
+      }
     }
 
     app.listen(PORT, () => {

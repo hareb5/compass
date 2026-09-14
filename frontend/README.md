@@ -8,6 +8,6 @@ bun run dev
 
 Open http://localhost:3020
 
-- `VITE_USE_API=true` proxies `/api` → `http://localhost:5020` and uses backend employee-code lookup.
+- `VITE_USE_API=true` proxies `/api` → `http://localhost:5020`, signs in via employee code, and saves scores in Mongo.
 - `VITE_SHOW_DEMO=true` shows demo accounts (keep off for launch).
-- `VITE_USE_API=true` is **not** Microsoft SSO. SSO needs Azure env on the backend plus MSAL on this app.
+- Microsoft sign-in button is still not wired. Azure keys on the backend are ready for when it is.

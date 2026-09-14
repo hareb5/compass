@@ -1,21 +1,15 @@
 const express = require("express");
-const azureAuth = require("../config/azureAuth");
 const orgApi = require("../config/orgApi");
 const {
   establishSessionFromEmployeeCode,
 } = require("../services/orgDirectory");
+const { signSessionToken } = require("../services/sessionToken");
 const { sendError } = require("../utils/httpError");
 
 const router = express.Router();
 const MAX_EMPLOYEE_CODE_LENGTH = 32;
 
 router.post("/employee-code", async (req, res) => {
-  if (!azureAuth.authDisabled && azureAuth.isConfigured) {
-    return res.status(403).json({
-      message: "Sign in with Microsoft SSO. Employee-code login is disabled.",
-    });
-  }
-
   if (!orgApi.isConfigured) {
     return res.status(503).json({
       message: "Org directory is not configured on the server.",
@@ -35,7 +29,16 @@ router.post("/employee-code", async (req, res) => {
 
   try {
     const identity = await establishSessionFromEmployeeCode(employeeCode);
-    return res.json(identity);
+    const accessToken = await signSessionToken({
+      employeeCode: identity.user.id,
+      email: identity.user.email,
+      name: identity.user.name,
+      role: identity.user.role,
+    });
+    return res.json({
+      ...identity,
+      accessToken,
+    });
   } catch (error) {
     const status = error.status || 500;
     if (status === 500) {

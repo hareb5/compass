@@ -16,6 +16,7 @@ export type OrgIdentity = {
   user: MockUser
   reports: MockUser[]
   assessments: AssessmentRecord[]
+  accessToken?: string
 }
 
 function normalizeCode(value: unknown): string {

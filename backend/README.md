@@ -10,14 +10,16 @@ npm install
 npm run dev
 ```
 
-Port **5020** by default. Seeds demo users/assessments on first start only.
+Port **5020** by default. Demo users are seeded only when `AUTH_DISABLED=true` and the database is empty.
+
+Employee-code login upserts the person, their manager, their team, and blank assessments into Mongo. Scores submitted from the app are stored there. Admin reads the same records.
 
 ## Endpoints
 
 | Method | Path | Role |
 |--------|------|------|
 | GET | `/health` | public |
-| POST | `/api/session/employee-code` | public until SSO is on |
+| POST | `/api/session/employee-code` | public (returns `accessToken`) |
 | GET | `/api/demo/accounts` | demo only |
 | GET | `/api/me` | any |
 | GET | `/api/assessments/mine` | employee / manager |
@@ -26,6 +28,7 @@ Port **5020** by default. Seeds demo users/assessments on first start only.
 | GET | `/api/admin/assessments` | admin |
 | POST | `/api/admin/reset` | admin (demo only) |
 
-When `AUTH_DISABLED=true`, send `X-Demo-User-Id: emp-1` on every request. Turn this off before launch.
+`AUTH_DISABLED=true`: send `X-Demo-User-Id` (seeded demo ids).  
+`AUTH_DISABLED=false`: send the `accessToken` from employee-code login as `Authorization: Bearer …`. Microsoft JWTs are also accepted once Azure keys are set (MSAL button still to come).
 
-SSO: set `AZURE_TENANT_ID` + `AZURE_CLIENT_ID`, leave `AUTH_DISABLED` unset, and send a Microsoft Bearer token. That disables employee-code login.
+List admin codes in `ADMIN_EMPLOYEE_CODES` (and/or `ADMIN_EMAILS`).

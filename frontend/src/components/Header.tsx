@@ -1,5 +1,6 @@
 import { Link, useRouterState } from '@tanstack/react-router'
 import { Button } from '#/components/ui/button'
+import { SHOW_DEMO } from '#/lib/config'
 import { useCompStore } from '#/store/comp-store'
 import { LogOut, RotateCcw } from 'lucide-react'
 
@@ -46,15 +47,17 @@ export default function Header() {
                   <Link to="/">Scoring home</Link>
                 </Button>
               )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => void resetMockData()}
-                title="Reset assessment data"
-              >
-                <RotateCcw className="size-4 sm:mr-2" />
-                <span className="hidden sm:inline">Reset data</span>
-              </Button>
+              {SHOW_DEMO ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void resetMockData()}
+                  title="Reset assessment data"
+                >
+                  <RotateCcw className="size-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Reset data</span>
+                </Button>
+              ) : null}
             </>
           ) : null}
           {currentUser ? (

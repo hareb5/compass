@@ -133,6 +133,11 @@ const SEED_ASSESSMENTS = [
 ];
 
 async function seedDatabase() {
+  if (process.env.AUTH_DISABLED !== "true") {
+    console.log("[Seed] Skipping demo seed because AUTH_DISABLED is not true.");
+    return;
+  }
+
   const userCount = await CompUser.countDocuments();
   if (userCount > 0) {
     console.log("[Seed] Database already has users — skipping seed.");

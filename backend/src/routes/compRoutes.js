@@ -22,6 +22,7 @@ const {
   stripForEmployee,
   stripForManager,
   serializeAdminAssessment,
+  ensureAssessment,
 } = require("../services/assessmentService");
 const { sendError } = require("../utils/httpError");
 
@@ -67,9 +68,20 @@ router.get("/assessments/mine", resolveCompUser, async (req, res) => {
     const user = req.compUser;
 
     if (user.role === USER_ROLES.EMPLOYEE) {
-      const assessment = await CompAssessment.findOne({
+      let assessment = await CompAssessment.findOne({
         employeeRef: user._id,
       });
+
+      if (!assessment && user.managerRef) {
+        const manager =
+          user.managerRef.externalId
+            ? user.managerRef
+            : await CompUser.findById(user.managerRef);
+        assessment = await ensureAssessment(user, manager);
+        if (assessment) {
+          assessment = await CompAssessment.findById(assessment._id);
+        }
+      }
 
       if (!assessment) {
         return res.json({ assessment: null });
@@ -88,6 +100,9 @@ router.get("/assessments/mine", resolveCompUser, async (req, res) => {
 
     if (user.role === USER_ROLES.MANAGER) {
       const reports = await getReportsFor(user._id);
+      await Promise.all(
+        reports.map((report) => ensureAssessment(report, user)),
+      );
       const reportIds = reports.map((report) => report._id);
       const assessments = await CompAssessment.find({
         employeeRef: { $in: reportIds },
@@ -137,7 +152,19 @@ router.post(
         return res.status(400).json({ message: validation.message });
       }
 
-      const assessment = await CompAssessment.findOne({ employeeRef: user._id });
+      let assessment = await CompAssessment.findOne({ employeeRef: user._id });
+      if (!assessment) {
+        const manager =
+          user.managerRef && user.managerRef._id
+            ? user.managerRef
+            : await CompUser.findById(user.managerRef);
+        if (!manager) {
+          return res.status(404).json({
+            message: "No manager is assigned for this assessment.",
+          });
+        }
+        assessment = await ensureAssessment(user, manager);
+      }
       if (!assessment) {
         return res.status(404).json({ message: "Assessment not found." });
       }
@@ -195,10 +222,13 @@ router.post(
         return res.status(400).json({ message: validation.message });
       }
 
-      const assessment = await CompAssessment.findOne({
+      let assessment = await CompAssessment.findOne({
         employeeRef: employee._id,
         managerRef: user._id,
       });
+      if (!assessment) {
+        assessment = await ensureAssessment(employee, user);
+      }
       if (!assessment) {
         return res.status(404).json({ message: "Assessment not found." });
       }

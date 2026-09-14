@@ -10,8 +10,8 @@ import {
 } from '#/lib/mock-data'
 import type { CompetencyId, ScoreMap } from '#/lib/competencies'
 import { isCompleteScores } from '#/lib/competencies'
-import { ORG_EMPLOYEE_CODE_KEY, USE_API } from '#/lib/config'
-import { setDemoUserId, setSsoAccessToken } from '#/lib/api'
+import { DEMO_USER_KEY, ORG_EMPLOYEE_CODE_KEY, SHOW_DEMO, USE_API } from '#/lib/config'
+import { getSsoAccessToken, setDemoUserId, setSsoAccessToken } from '#/lib/api'
 import {
   fetchAdminAssessments,
   fetchDemoAccounts,
@@ -21,6 +21,7 @@ import {
   submitManagerScores as apiSubmitManagerScores,
   submitSelfScores as apiSubmitSelfScores,
   type AdminAssessmentRow,
+  type MeResponse,
 } from '#/lib/comp-api'
 import { establishSessionFromEmployeeCode } from '#/lib/org-directory'
 
@@ -97,7 +98,45 @@ function setOrgEmployeeCode(code: string | null) {
 }
 
 function usesLocalScoring(sessionKind: SessionKind, useApi: boolean) {
-  return sessionKind === 'org' || sessionKind === 'mock' || !useApi
+  return sessionKind === 'mock' || !useApi
+}
+
+async function buildApiWorkspace(me: MeResponse): Promise<Partial<CompState>> {
+  const reports = me.reports ?? []
+  const next: Partial<CompState> = {
+    sessionKind: 'api',
+    currentUser: me,
+    reports,
+    usersById: indexUsers([me, ...reports]),
+    isLoading: false,
+    error: null,
+  }
+
+  switch (me.role) {
+    case 'admin': {
+      const admin = await fetchAdminAssessments()
+      Object.assign(next, applyAdminRows(admin.assessments))
+      break
+    }
+    case 'employee': {
+      const mine = await fetchMyAssessments()
+      next.assessments = mine.assessment ? [mine.assessment] : []
+      break
+    }
+    case 'manager': {
+      const mine = await fetchMyAssessments()
+      next.assessments = mine.assessments ?? []
+      next.reports = mine.reports ?? reports
+      next.usersById = indexUsers([me, ...(mine.reports ?? reports)])
+      break
+    }
+    default: {
+      const _exhaustive: never = me.role
+      throw new Error(`Unhandled role: ${_exhaustive}`)
+    }
+  }
+
+  return next
 }
 
 export const useCompStore = create<CompState>()(
@@ -117,105 +156,93 @@ export const useCompStore = create<CompState>()(
       setHasHydrated: (value) => set({ hasHydrated: value }),
 
       loadDemoAccounts: async () => {
-        if (!USE_API) return
+        if (!USE_API || !SHOW_DEMO) return
         try {
           const { accounts } = await fetchDemoAccounts()
           set({ demoAccounts: accounts })
-        } catch (error) {
-          set({
-            error:
-              error instanceof Error
-                ? error.message
-                : 'Failed to load demo accounts.',
-          })
+        } catch {
+          set({ demoAccounts: [] })
         }
       },
 
       restoreSession: async () => {
-        const orgCode = getOrgEmployeeCode()
-        if (orgCode) {
+        if (USE_API) {
+          const orgCode = getOrgEmployeeCode()
+          const existingToken = getSsoAccessToken()
+          const demoUserId =
+            typeof window !== 'undefined'
+              ? sessionStorage.getItem(DEMO_USER_KEY)
+              : null
+
+          if (!orgCode && !existingToken && !demoUserId) {
+            return
+          }
+
           set({ isLoading: true, error: null })
           try {
-            const identity = await establishSessionFromEmployeeCode(orgCode)
-            const previous = get().assessments
-            const previousByEmployee = Object.fromEntries(
-              previous.map((record) => [record.employeeId, record]),
-            )
-            const assessments = identity.assessments.map(
-              (record) => previousByEmployee[record.employeeId] ?? record,
-            )
-            set({
-              sessionKind: 'org',
-              currentUser: identity.user,
-              reports: identity.reports,
-              usersById: indexUsers([identity.user, ...identity.reports]),
-              assessments,
-              isLoading: false,
-              error: null,
-            })
+            if (orgCode) {
+              const identity =
+                await establishSessionFromEmployeeCode(orgCode)
+              if (identity.accessToken) {
+                setSsoAccessToken(identity.accessToken)
+              }
+              setDemoUserId(identity.user.id)
+              setOrgEmployeeCode(identity.user.id)
+            } else if (demoUserId) {
+              setDemoUserId(demoUserId)
+            }
+
+            const me = await fetchMe()
+            set(await buildApiWorkspace(me))
           } catch (error) {
+            setDemoUserId(null)
+            setSsoAccessToken(null)
             setOrgEmployeeCode(null)
             set({
-              sessionKind: 'none',
               currentUser: null,
+              sessionKind: 'none',
               isLoading: false,
               error:
                 error instanceof Error
                   ? error.message
-                  : 'Failed to restore org session.',
+                  : 'Failed to restore session.',
             })
           }
           return
         }
 
-        if (!USE_API) return
-        const demoUserId =
-          typeof window !== 'undefined'
-            ? sessionStorage.getItem('comptool-demo-user-id')
-            : null
-        if (!demoUserId) return
+        const orgCode = getOrgEmployeeCode()
+        if (!orgCode) return
 
         set({ isLoading: true, error: null })
         try {
-          setDemoUserId(demoUserId)
-          const me = await fetchMe()
-          const reports = me.reports ?? []
-          const next: Partial<CompState> = {
-            sessionKind: 'api',
-            currentUser: me,
-            reports,
-            usersById: indexUsers([me, ...reports]),
-            isLoading: false,
-          }
-
-          if (me.role === 'admin') {
-            const admin = await fetchAdminAssessments()
-            Object.assign(next, applyAdminRows(admin.assessments))
-          } else {
-            const mine = await fetchMyAssessments()
-            if (me.role === 'employee') {
-              next.assessments = mine.assessment ? [mine.assessment] : []
-            } else if (me.role === 'manager') {
-              next.assessments = mine.assessments ?? []
-              next.reports = mine.reports ?? reports
-              next.usersById = indexUsers([
-                me,
-                ...(mine.reports ?? reports),
-              ])
-            }
-          }
-
-          set(next)
-        } catch (error) {
-          setDemoUserId(null)
+          const identity = await establishSessionFromEmployeeCode(orgCode)
+          const previous = get().assessments
+          const previousByEmployee = Object.fromEntries(
+            previous.map((record) => [record.employeeId, record]),
+          )
+          const assessments = identity.assessments.map(
+            (record) => previousByEmployee[record.employeeId] ?? record,
+          )
           set({
-            currentUser: null,
+            sessionKind: 'org',
+            currentUser: identity.user,
+            reports: identity.reports,
+            usersById: indexUsers([identity.user, ...identity.reports]),
+            assessments,
+            isLoading: false,
+            error: null,
+          })
+        } catch (error) {
+          setOrgEmployeeCode(null)
+          set({
             sessionKind: 'none',
+            currentUser: null,
             isLoading: false,
             error:
               error instanceof Error
                 ? error.message
-                : 'Failed to restore session.',
+                : 'Failed to restore org session.',
           })
         }
       },
@@ -241,34 +268,7 @@ export const useCompStore = create<CompState>()(
         try {
           setDemoUserId(userId)
           const me = await fetchMe()
-          const reports = me.reports ?? []
-
-          const next: Partial<CompState> = {
-            sessionKind: 'api',
-            currentUser: me,
-            reports,
-            usersById: indexUsers([me, ...reports]),
-            isLoading: false,
-          }
-
-          if (me.role === 'admin') {
-            const admin = await fetchAdminAssessments()
-            Object.assign(next, applyAdminRows(admin.assessments))
-          } else {
-            const mine = await fetchMyAssessments()
-            if (me.role === 'employee') {
-              next.assessments = mine.assessment ? [mine.assessment] : []
-            } else if (me.role === 'manager') {
-              next.assessments = mine.assessments ?? []
-              next.reports = mine.reports ?? reports
-              next.usersById = indexUsers([
-                me,
-                ...(mine.reports ?? reports),
-              ])
-            }
-          }
-
-          set(next)
+          set(await buildApiWorkspace(me))
         } catch (error) {
           setDemoUserId(null)
           set({
@@ -283,9 +283,20 @@ export const useCompStore = create<CompState>()(
       signInWithEmployeeCode: async (employeeCode) => {
         set({ isLoading: true, error: null })
         try {
-          setDemoUserId(null)
           const identity = await establishSessionFromEmployeeCode(employeeCode)
           setOrgEmployeeCode(identity.user.id)
+
+          if (USE_API) {
+            if (identity.accessToken) {
+              setSsoAccessToken(identity.accessToken)
+            }
+            setDemoUserId(identity.user.id)
+            const me = await fetchMe()
+            set(await buildApiWorkspace(me))
+            return
+          }
+
+          setDemoUserId(null)
           set({
             sessionKind: 'org',
             currentUser: identity.user,
@@ -297,6 +308,8 @@ export const useCompStore = create<CompState>()(
           })
         } catch (error) {
           setOrgEmployeeCode(null)
+          setSsoAccessToken(null)
+          setDemoUserId(null)
           set({
             isLoading: false,
             sessionKind: 'none',
@@ -500,17 +513,17 @@ export const useCompStore = create<CompState>()(
     {
       name: USE_API ? 'comptool-api-v1' : 'comptool-mock-v1',
       partialize: (state) =>
-        state.sessionKind === 'org'
-          ? {
-              currentUser: state.currentUser,
-              reports: state.reports,
-              usersById: state.usersById,
-              assessments: state.assessments,
-              sessionKind: state.sessionKind,
-              hasHydrated: state.hasHydrated,
-            }
-          : USE_API
-            ? { hasHydrated: state.hasHydrated }
+        USE_API
+          ? { hasHydrated: state.hasHydrated }
+          : state.sessionKind === 'org'
+            ? {
+                currentUser: state.currentUser,
+                reports: state.reports,
+                usersById: state.usersById,
+                assessments: state.assessments,
+                sessionKind: state.sessionKind,
+                hasHydrated: state.hasHydrated,
+              }
             : {
                 currentUser: state.currentUser,
                 assessments: state.assessments,
@@ -519,7 +532,7 @@ export const useCompStore = create<CompState>()(
       onRehydrateStorage: () => async (state) => {
         state?.setHasHydrated(true)
         await state?.restoreSession()
-        if (USE_API) {
+        if (USE_API && SHOW_DEMO) {
           await state?.loadDemoAccounts()
         }
       },

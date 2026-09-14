@@ -1,17 +1,6 @@
 const mongoose = require("mongoose");
 const { USER_ROLE_VALUES } = require("../constants/userRoles");
 
-const scoreSchema = new mongoose.Schema(
-  {
-    communication: { type: Number, min: 1, max: 5, default: null },
-    collaboration: { type: Number, min: 1, max: 5, default: null },
-    results: { type: Number, min: 1, max: 5, default: null },
-    innovation: { type: Number, min: 1, max: 5, default: null },
-    accountability: { type: Number, min: 1, max: 5, default: null },
-  },
-  { _id: false },
-);
-
 const compUserSchema = new mongoose.Schema(
   {
     externalId: {
@@ -36,16 +25,19 @@ const compUserSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+      unique: true,
     },
     department: {
       type: String,
       required: true,
       trim: true,
+      default: "General",
     },
     title: {
       type: String,
       required: true,
       trim: true,
+      default: "Employee",
     },
     role: {
       type: String,
@@ -56,6 +48,7 @@ const compUserSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "CompUser",
       default: null,
+      index: true,
     },
   },
   { timestamps: true },

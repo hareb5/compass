@@ -4,6 +4,7 @@ const {
   weightedFinalScore,
 } = require("../constants/competencies");
 const { serializeUser } = require("./orgHierarchy");
+const { ensureAssessment } = require("./orgSync");
 
 function scoresToObject(scores) {
   if (!scores) return null;
@@ -83,4 +84,5 @@ module.exports = {
   stripForEmployee,
   stripForManager,
   serializeAdminAssessment,
+  ensureAssessment,
 };
