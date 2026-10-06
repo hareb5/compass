@@ -113,6 +113,47 @@ export async function handleMicrosoftRedirect(): Promise<MicrosoftRedirectResult
   return null
 }
 
+export type MicrosoftTokens = {
+  idToken: string | null
+  accessToken: string | null
+}
+
+export async function acquireMicrosoftTokens(
+  fallbackIdToken?: string | null,
+): Promise<MicrosoftTokens> {
+  const fallback = fallbackIdToken?.trim() || null
+  if (!isMsalConfigured() || typeof window === 'undefined') {
+    return { idToken: fallback, accessToken: null }
+  }
+
+  const msalInstance = await getMsalInstance()
+  if (!msalInstance) {
+    return { idToken: fallback, accessToken: null }
+  }
+
+  const account =
+    msalInstance.getActiveAccount() ?? msalInstance.getAllAccounts().at(0) ?? null
+  if (!account) {
+    return { idToken: fallback, accessToken: null }
+  }
+
+  msalInstance.setActiveAccount(account)
+
+  try {
+    const result = await msalInstance.acquireTokenSilent({
+      ...loginRequest,
+      account,
+    })
+    return {
+      idToken: result.idToken?.trim() || fallback,
+      accessToken: result.accessToken?.trim() || null,
+    }
+  } catch (error) {
+    console.error('[Auth] Failed to acquire Microsoft token for API:', error)
+    return { idToken: fallback, accessToken: null }
+  }
+}
+
 export async function loginWithMicrosoft() {
   ensureMsalConfigured()
   const msalInstance = await getMsalInstance()
@@ -166,34 +207,6 @@ export async function getActiveMicrosoftAccount() {
 export async function getMicrosoftAuthToken(
   fallbackIdToken?: string | null,
 ): Promise<string | null> {
-  if (!isMsalConfigured() || typeof window === 'undefined') {
-    return fallbackIdToken?.trim() || null
-  }
-
-  const msalInstance = await getMsalInstance()
-  if (!msalInstance) {
-    return fallbackIdToken?.trim() || null
-  }
-
-  const account =
-    msalInstance.getActiveAccount() ?? msalInstance.getAllAccounts().at(0) ?? null
-  if (!account) {
-    return fallbackIdToken?.trim() || null
-  }
-
-  msalInstance.setActiveAccount(account)
-
-  try {
-    const result = await msalInstance.acquireTokenSilent({
-      ...loginRequest,
-      account,
-    })
-    if (result.idToken?.trim()) {
-      return result.idToken.trim()
-    }
-  } catch (error) {
-    console.error('[Auth] Failed to acquire Microsoft token for API:', error)
-  }
-
-  return fallbackIdToken?.trim() || null
+  const tokens = await acquireMicrosoftTokens(fallbackIdToken)
+  return tokens.idToken
 }

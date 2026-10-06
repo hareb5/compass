@@ -1,11 +1,12 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { AuthHeroPanel } from '#/components/AuthHeroPanel'
+import { SsoDebugPanel } from '#/components/scoring/SsoDebugPanel'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
-import { getDemoAccounts, type Role } from '#/lib/mock-data'
 import { SHOW_DEMO, USE_API } from '#/lib/config'
+import { getDemoAccounts, type Role } from '#/lib/mock-data'
 import {
   formatMsalError,
   isMsalConfigured,
@@ -41,6 +42,7 @@ export function LoginScreen() {
   const demoAccounts = useCompStore((s) => s.demoAccounts)
   const isLoading = useCompStore((s) => s.isLoading)
   const error = useCompStore((s) => s.error)
+  const ssoDebug = useCompStore((s) => s.ssoDebug)
   const loadDemoAccounts = useCompStore((s) => s.loadDemoAccounts)
 
   const [employeeCode, setEmployeeCode] = useState('')
@@ -117,6 +119,8 @@ export function LoginScreen() {
               {displayError}
             </p>
           ) : null}
+
+          {ssoDebug ? <SsoDebugPanel dump={ssoDebug} /> : null}
 
           {microsoftEnabled ? (
             <Button

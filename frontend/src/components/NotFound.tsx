@@ -1,10 +1,14 @@
 import { Link } from '@tanstack/react-router'
 import { Button } from '#/components/ui/button'
+import { SsoDebugPanel } from '#/components/scoring/SsoDebugPanel'
+import { useCompStore } from '#/store/comp-store'
 
 export function NotFound() {
+  const ssoDebug = useCompStore((s) => s.ssoDebug)
+
   return (
     <main className="flex min-h-[calc(100vh-72px)] items-center justify-center bg-white px-5 py-16">
-      <div className="w-full max-w-md text-center">
+      <div className={`w-full text-center ${ssoDebug ? 'max-w-2xl' : 'max-w-md'}`}>
         <p className="text-sm font-semibold tracking-[0.2em] text-primary">
           404
         </p>
@@ -18,6 +22,7 @@ export function NotFound() {
         <Button asChild className="mt-8" size="lg">
           <Link to="/">Back to home</Link>
         </Button>
+        {ssoDebug ? <SsoDebugPanel dump={ssoDebug} /> : null}
       </div>
     </main>
   )

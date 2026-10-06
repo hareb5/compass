@@ -31,6 +31,11 @@ import {
   type MeResponse,
 } from '#/lib/comp-api'
 import { establishSessionFromEmployeeCode } from '#/lib/org-directory'
+import {
+  collectSsoDebugDump,
+  formatSsoDebugDump,
+  type SsoDebugDump,
+} from '#/lib/sso-debug'
 
 type SessionKind = 'none' | 'mock' | 'api' | 'org'
 
@@ -45,6 +50,7 @@ type CompState = {
   demoAccounts: MockUser[]
   isLoading: boolean
   error: string | null
+  ssoDebug: SsoDebugDump | null
   hasHydrated: boolean
   setHasHydrated: (value: boolean) => void
   loadDemoAccounts: () => Promise<void>
@@ -159,6 +165,7 @@ export const useCompStore = create<CompState>()(
       demoAccounts: [],
       isLoading: false,
       error: null,
+      ssoDebug: null,
       hasHydrated: false,
       setHasHydrated: (value) => set({ hasHydrated: value }),
 
@@ -183,6 +190,13 @@ export const useCompStore = create<CompState>()(
               if (redirect?.idToken) {
                 setSsoAccessToken(redirect.idToken)
                 microsoftReady = true
+                if (
+                  typeof window !== 'undefined' &&
+                  window.location.pathname !== '/'
+                ) {
+                  window.location.replace('/')
+                  return
+                }
               } else {
                 const account = await getActiveMicrosoftAccount()
                 if (account) {
@@ -225,6 +239,13 @@ export const useCompStore = create<CompState>()(
             if (microsoftReady) {
               setDemoUserId(null)
               setOrgEmployeeCode(null)
+              try {
+                const ssoDebug = await collectSsoDebugDump()
+                console.log('[SSO debug]', formatSsoDebugDump(ssoDebug))
+                set({ ssoDebug })
+              } catch (debugError) {
+                console.error('[SSO debug] Failed to capture SSO details', debugError)
+              }
               const me = await fetchMe()
               set(await buildApiWorkspace(me))
               return
@@ -383,6 +404,7 @@ export const useCompStore = create<CompState>()(
           assessments: USE_API ? [] : createInitialAssessments(),
           adminRows: [],
           error: null,
+          ssoDebug: null,
         })
       },
 
