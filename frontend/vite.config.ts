@@ -1,7 +1,12 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { defineConfig, loadEnv, type ProxyOptions } from 'vite'
-import { tanstackStart } from '@tanstack/react-start/plugin/vite'
+import {
+  defineConfig,
+  loadEnv,
+  type Plugin,
+  type ProxyOptions,
+} from 'vite'
+import { tanstackRouter } from '@tanstack/router-plugin/vite'
 import viteReact from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
@@ -66,9 +71,19 @@ function buildProxy(env: Record<string, string>): Record<string, ProxyOptions> {
   return proxy
 }
 
+/** Fills the public site origin into index.html (Open Graph / canonical URLs). */
+function appOriginPlugin(origin: string): Plugin {
+  return {
+    name: 'comptool-app-origin',
+    transformIndexHtml: (html) => html.replaceAll('__APP_ORIGIN__', origin),
+  }
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadProjectEnv(mode)
   const proxy = buildProxy(env)
+  const appOrigin =
+    (env.VITE_APP_URL ?? '').trim().replace(/\/$/, '') || 'http://localhost:3020'
 
   const msalClientId = env.VITE_MSAL_CLIENT_ID?.trim() ?? ''
   const msalTenantId = env.VITE_MSAL_TENANT_ID?.trim() ?? ''
@@ -100,9 +115,15 @@ export default defineConfig(({ mode }) => {
       proxy: Object.keys(proxy).length ? proxy : undefined,
     },
     resolve: { tsconfigPaths: true },
-    plugins: [tailwindcss(), tanstackStart(), viteReact()],
+    plugins: [
+      tailwindcss(),
+      // Must run before the React plugin. Generates src/routeTree.gen.ts.
+      tanstackRouter({ target: 'react', autoCodeSplitting: true }),
+      viteReact(),
+      appOriginPlugin(appOrigin),
+    ],
     define: {
-      // TanStack server bundles do not load .env at runtime — inject at build time
+      // Normalised values (handles BOM-prefixed .env keys) injected at build time
       'import.meta.env.VITE_MSAL_CLIENT_ID': JSON.stringify(msalClientId),
       'import.meta.env.VITE_MSAL_TENANT_ID': JSON.stringify(msalTenantId),
       'import.meta.env.VITE_MSAL_REDIRECT_URI': JSON.stringify(msalRedirectUri),
