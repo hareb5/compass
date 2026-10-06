@@ -2,7 +2,7 @@
 
 Frontend (port 3020) + backend (port 5020).
 
-You never paste tokens anywhere. Microsoft login (when we add the button) saves the token in the browser by itself, then the app sends it to the API. That is not a deploy step.
+You never paste tokens anywhere. Microsoft login saves the token in the browser by itself, then the app sends it to the API. That is not a deploy step.
 
 ---
 
@@ -28,11 +28,11 @@ Open http://localhost:3020 and click a demo account. Do not start Mongo or the b
 
 ---
 
-## 2. API + Mongo (employee code now, Microsoft button later)
+## 2. API + Mongo (employee code or Microsoft SSO)
 
-Set `VITE_USE_API=true` and `AUTH_DISABLED=false`. People sign in with employee code. The API loads the org directory, saves boss/team links in Mongo, and stores scores so admin can see them.
+Set `VITE_USE_API=true` and `AUTH_DISABLED=false`. People can sign in with Microsoft (MSAL) or employee code. The API loads the org directory, saves boss/team links in Mongo, and stores scores so admin can see them.
 
-Microsoft SSO keys can sit in backend env now; the login **button** is still not in the frontend. When that is added, the same API will accept the Microsoft token and map email → employee code.
+Frontend Microsoft login reads **`VITE_MSAL_CLIENT_ID`** and **`VITE_MSAL_TENANT_ID`** (not `AZURE_*`). Backend still uses `AZURE_TENANT_ID` / `AZURE_CLIENT_ID` to verify the same app.
 
 **Frontend build env**
 
@@ -40,6 +40,9 @@ Microsoft SSO keys can sit in backend env now; the login **button** is still not
 VITE_USE_API=true
 VITE_SHOW_DEMO=false
 VITE_APP_URL=https://your-domain
+VITE_MSAL_CLIENT_ID=...
+VITE_MSAL_TENANT_ID=...
+VITE_MSAL_REDIRECT_URI=https://your-domain
 ```
 
 **Backend env**

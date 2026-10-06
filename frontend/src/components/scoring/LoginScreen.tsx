@@ -6,6 +6,11 @@ import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { getDemoAccounts, type Role } from '#/lib/mock-data'
 import { SHOW_DEMO, USE_API } from '#/lib/config'
+import {
+  formatMsalError,
+  isMsalConfigured,
+  loginWithMicrosoft,
+} from '#/lib/msal-auth'
 import { useCompStore } from '#/store/comp-store'
 import { Shield, User, Users } from 'lucide-react'
 
@@ -40,8 +45,13 @@ export function LoginScreen() {
 
   const [employeeCode, setEmployeeCode] = useState('')
   const [honeypot, setHoneypot] = useState('')
+  const [authError, setAuthError] = useState<string | null>(null)
+  const [isAuthRedirecting, setIsAuthRedirecting] = useState(false)
 
   const accounts = USE_API ? demoAccounts : getDemoAccounts()
+  const microsoftEnabled = USE_API && isMsalConfigured()
+  const busy = isLoading || isAuthRedirecting
+  const displayError = authError || error
 
   useEffect(() => {
     if (USE_API && SHOW_DEMO) {
@@ -52,7 +62,26 @@ export function LoginScreen() {
   const handleEmployeeCodeSubmit = (event: FormEvent) => {
     event.preventDefault()
     if (honeypot.trim()) return
+    setAuthError(null)
     void signInWithEmployeeCode(employeeCode)
+  }
+
+  const handleMicrosoftLogin = async () => {
+    setAuthError(null)
+    if (!isMsalConfigured()) {
+      setAuthError(
+        'Microsoft SSO is not configured. Set VITE_MSAL_CLIENT_ID and VITE_MSAL_TENANT_ID, then restart the frontend.',
+      )
+      return
+    }
+
+    setIsAuthRedirecting(true)
+    try {
+      await loginWithMicrosoft()
+    } catch (loginError) {
+      setAuthError(formatMsalError(loginError))
+      setIsAuthRedirecting(false)
+    }
   }
 
   return (
@@ -74,20 +103,57 @@ export function LoginScreen() {
               Competency mapping and skill assessment system
             </p>
             <p className="mt-3 text-sm text-muted-foreground">
-              Enter your employee code to continue.
+              {microsoftEnabled
+                ? 'Sign in with Microsoft to continue.'
+                : 'Enter your employee code to continue.'}
             </p>
           </div>
 
-          {error ? (
+          {displayError ? (
             <p
               className="mt-6 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
               role="alert"
             >
-              {error}
+              {displayError}
+            </p>
+          ) : null}
+
+          {microsoftEnabled ? (
+            <Button
+              className="mt-8 flex w-full items-center justify-center gap-3"
+              size="lg"
+              disabled={busy}
+              onClick={() => void handleMicrosoftLogin()}
+            >
+              <img
+                src="/microsoft.png"
+                alt=""
+                className="h-5 w-5 object-contain"
+                aria-hidden
+              />
+              {isLoading
+                ? 'Completing sign in…'
+                : isAuthRedirecting
+                  ? 'Redirecting to Microsoft…'
+                  : 'Sign in with Microsoft Single Sign-On'}
+            </Button>
+          ) : USE_API ? (
+            <p className="mt-8 text-sm text-muted-foreground">
+              Microsoft SSO is not configured. Set VITE_MSAL_CLIENT_ID and
+              VITE_MSAL_TENANT_ID, then restart the frontend.
             </p>
           ) : null}
 
           <form className="relative mt-8 space-y-3" onSubmit={handleEmployeeCodeSubmit}>
+            {microsoftEnabled ? (
+              <div className="mb-3 flex items-center gap-3">
+                <div className="h-px flex-1 bg-border" />
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                  or employee code
+                </p>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+            ) : null}
             <div hidden aria-hidden="true">
               <label htmlFor="company-website">Company website</label>
               <input
@@ -110,7 +176,7 @@ export function LoginScreen() {
                 autoComplete="username"
                 inputMode="text"
                 maxLength={32}
-                disabled={isLoading}
+                disabled={busy}
               />
               <p className="text-xs text-muted-foreground">
                 If this code is an L1 manager for others, you score that team.
@@ -121,9 +187,11 @@ export function LoginScreen() {
               type="submit"
               className="w-full min-h-11"
               size="lg"
-              disabled={isLoading || !employeeCode.trim()}
+              disabled={busy || !employeeCode.trim()}
             >
-              {isLoading ? 'Checking directory…' : 'Continue'}
+              {isLoading && !isAuthRedirecting
+                ? 'Checking directory…'
+                : 'Continue'}
             </Button>
           </form>
 
@@ -145,7 +213,7 @@ export function LoginScreen() {
                     <button
                       key={account.id}
                       type="button"
-                      disabled={isLoading}
+                      disabled={busy}
                       onClick={() => void signInAs(account.id)}
                       className="flex min-h-11 w-full items-start gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-sm transition hover:border-primary/40 hover:bg-accent/40 disabled:opacity-60"
                     >

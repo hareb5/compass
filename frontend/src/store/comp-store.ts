@@ -13,6 +13,13 @@ import { isCompleteScores } from '#/lib/competencies'
 import { DEMO_USER_KEY, ORG_EMPLOYEE_CODE_KEY, SHOW_DEMO, USE_API } from '#/lib/config'
 import { getSsoAccessToken, setDemoUserId, setSsoAccessToken } from '#/lib/api'
 import {
+  formatMsalError,
+  getActiveMicrosoftAccount,
+  getMicrosoftAuthToken,
+  handleMicrosoftRedirect,
+  isMsalConfigured,
+} from '#/lib/msal-auth'
+import {
   fetchAdminAssessments,
   fetchDemoAccounts,
   fetchMe,
@@ -167,6 +174,36 @@ export const useCompStore = create<CompState>()(
 
       restoreSession: async () => {
         if (USE_API) {
+          let microsoftReady = false
+
+          if (isMsalConfigured()) {
+            set({ isLoading: true, error: null })
+            try {
+              const redirect = await handleMicrosoftRedirect()
+              if (redirect?.idToken) {
+                setSsoAccessToken(redirect.idToken)
+                microsoftReady = true
+              } else {
+                const account = await getActiveMicrosoftAccount()
+                if (account) {
+                  const token = await getMicrosoftAuthToken(getSsoAccessToken())
+                  if (token) {
+                    setSsoAccessToken(token)
+                    microsoftReady = true
+                  }
+                }
+              }
+            } catch (error) {
+              set({
+                currentUser: null,
+                sessionKind: 'none',
+                isLoading: false,
+                error: formatMsalError(error),
+              })
+              return
+            }
+          }
+
           const orgCode = getOrgEmployeeCode()
           const existingToken = getSsoAccessToken()
           const demoUserId =
@@ -174,12 +211,25 @@ export const useCompStore = create<CompState>()(
               ? sessionStorage.getItem(DEMO_USER_KEY)
               : null
 
-          if (!orgCode && !existingToken && !demoUserId) {
+          if (!orgCode && !existingToken && !demoUserId && !microsoftReady) {
+            if (isMsalConfigured()) {
+              set({ isLoading: false })
+            }
             return
           }
 
-          set({ isLoading: true, error: null })
+          if (!isMsalConfigured()) {
+            set({ isLoading: true, error: null })
+          }
           try {
+            if (microsoftReady) {
+              setDemoUserId(null)
+              setOrgEmployeeCode(null)
+              const me = await fetchMe()
+              set(await buildApiWorkspace(me))
+              return
+            }
+
             if (orgCode) {
               const identity =
                 await establishSessionFromEmployeeCode(orgCode)

@@ -14,5 +14,5 @@ export const DEMO_USER_KEY = 'comptool-demo-user-id'
 /** Session key for emp-code / future SSO sign-in via org directory. */
 export const ORG_EMPLOYEE_CODE_KEY = 'compass-org-employee-code'
 
-/** Populated by Microsoft SSO (MSAL) once that is wired. */
+/** Microsoft ID token or employee-code session token sent as Authorization Bearer. */
 export const SSO_ACCESS_TOKEN_KEY = 'comptool-sso-access-token'

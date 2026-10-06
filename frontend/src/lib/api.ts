@@ -2,6 +2,7 @@ import {
   DEMO_USER_KEY,
   SSO_ACCESS_TOKEN_KEY,
 } from '#/lib/config'
+import { getMicrosoftAuthToken } from '#/lib/msal-auth'
 
 export class ApiError extends Error {
   status: number
@@ -50,9 +51,9 @@ export async function apiFetch<T>(
     headers.set('Content-Type', 'application/json')
   }
 
-  const ssoToken = getSsoAccessToken()
-  if (ssoToken && !headers.has('Authorization')) {
-    headers.set('Authorization', `Bearer ${ssoToken}`)
+  const token = await getMicrosoftAuthToken(getSsoAccessToken())
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`)
   }
 
   const demoUserId = getDemoUserId()

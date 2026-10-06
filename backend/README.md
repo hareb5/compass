@@ -29,6 +29,6 @@ Employee-code login upserts the person, their manager, their team, and blank ass
 | POST | `/api/admin/reset` | admin (demo only) |
 
 `AUTH_DISABLED=true`: send `X-Demo-User-Id` (seeded demo ids).  
-`AUTH_DISABLED=false`: send the `accessToken` from employee-code login as `Authorization: Bearer …`. Microsoft JWTs are also accepted once Azure keys are set (MSAL button still to come).
+`AUTH_DISABLED=false`: send the `accessToken` from employee-code login as `Authorization: Bearer …`, or the Microsoft ID token from frontend MSAL (`VITE_MSAL_*`).
 
 List admin codes in `ADMIN_EMPLOYEE_CODES` (and/or `ADMIN_EMAILS`).
