@@ -1,6 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { AuthHeroPanel } from '#/components/AuthHeroPanel'
-import { SsoDebugPanel } from '#/components/scoring/SsoDebugPanel'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
@@ -42,7 +41,6 @@ export function LoginScreen() {
   const demoAccounts = useCompStore((s) => s.demoAccounts)
   const isLoading = useCompStore((s) => s.isLoading)
   const error = useCompStore((s) => s.error)
-  const ssoDebug = useCompStore((s) => s.ssoDebug)
   const loadDemoAccounts = useCompStore((s) => s.loadDemoAccounts)
 
   const [employeeCode, setEmployeeCode] = useState('')
@@ -119,8 +117,6 @@ export function LoginScreen() {
               {displayError}
             </p>
           ) : null}
-
-          {ssoDebug ? <SsoDebugPanel dump={ssoDebug} /> : null}
 
           {microsoftEnabled ? (
             <Button

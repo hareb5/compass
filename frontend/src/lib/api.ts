@@ -51,7 +51,7 @@ export async function apiFetch<T>(
     headers.set('Content-Type', 'application/json')
   }
 
-  const token = await getMicrosoftAuthToken(getSsoAccessToken())
+  const token = getSsoAccessToken() || (await getMicrosoftAuthToken())
   if (token && !headers.has('Authorization')) {
     headers.set('Authorization', `Bearer ${token}`)
   }

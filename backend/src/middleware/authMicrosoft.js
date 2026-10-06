@@ -52,16 +52,22 @@ function extractName(payload) {
   return typeof raw === "string" ? raw.trim() : "";
 }
 
+function readClaimString(value) {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return "";
+}
+
 function extractEmployeeCode(payload) {
   if (!payload || typeof payload !== "object") return "";
-  const raw =
-    payload.employeeid ||
-    payload.employee_id ||
-    payload.employeeCode ||
-    payload.extension_EmployeeID ||
-    payload.extension_employeeid ||
-    "";
-  return typeof raw === "string" ? raw.trim() : "";
+  return (
+    readClaimString(payload.employeeId) ||
+    readClaimString(payload.employeeid) ||
+    readClaimString(payload.employee_id) ||
+    readClaimString(payload.employeeCode) ||
+    readClaimString(payload.extension_EmployeeID) ||
+    readClaimString(payload.extension_employeeid)
+  );
 }
 
 async function verifyBearerToken(token) {

@@ -210,3 +210,35 @@ export async function getMicrosoftAuthToken(
   const tokens = await acquireMicrosoftTokens(fallbackIdToken)
   return tokens.idToken
 }
+
+export async function fetchGraphEmployeeId(): Promise<string> {
+  const tokens = await acquireMicrosoftTokens()
+  if (!tokens.accessToken) {
+    throw new Error(
+      'Could not read employee ID from Microsoft. Sign in again.',
+    )
+  }
+
+  const response = await fetch(
+    'https://graph.microsoft.com/v1.0/me?$select=employeeId',
+    { headers: { Authorization: `Bearer ${tokens.accessToken}` } },
+  )
+  const payload = await response.json().catch(() => null)
+  if (!response.ok) {
+    throw new Error('Could not read employee ID from Microsoft Graph.')
+  }
+
+  const raw = payload && typeof payload === 'object' ? payload.employeeId : null
+  const employeeId =
+    typeof raw === 'string'
+      ? raw.trim()
+      : typeof raw === 'number'
+        ? String(raw)
+        : ''
+
+  if (!employeeId) {
+    throw new Error('Microsoft account has no employee ID.')
+  }
+
+  return employeeId
+}

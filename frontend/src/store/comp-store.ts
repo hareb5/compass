@@ -13,9 +13,9 @@ import { isCompleteScores } from '#/lib/competencies'
 import { DEMO_USER_KEY, ORG_EMPLOYEE_CODE_KEY, SHOW_DEMO, USE_API } from '#/lib/config'
 import { getSsoAccessToken, setDemoUserId, setSsoAccessToken } from '#/lib/api'
 import {
+  fetchGraphEmployeeId,
   formatMsalError,
   getActiveMicrosoftAccount,
-  getMicrosoftAuthToken,
   handleMicrosoftRedirect,
   isMsalConfigured,
 } from '#/lib/msal-auth'
@@ -31,11 +31,6 @@ import {
   type MeResponse,
 } from '#/lib/comp-api'
 import { establishSessionFromEmployeeCode } from '#/lib/org-directory'
-import {
-  collectSsoDebugDump,
-  formatSsoDebugDump,
-  type SsoDebugDump,
-} from '#/lib/sso-debug'
 
 type SessionKind = 'none' | 'mock' | 'api' | 'org'
 
@@ -50,13 +45,11 @@ type CompState = {
   demoAccounts: MockUser[]
   isLoading: boolean
   error: string | null
-  ssoDebug: SsoDebugDump | null
   hasHydrated: boolean
   setHasHydrated: (value: boolean) => void
   loadDemoAccounts: () => Promise<void>
   restoreSession: () => Promise<void>
   signInAs: (userId: string) => Promise<void>
-  /** Emp-code sign-in now; same path SSO will use once it yields a code. */
   signInWithEmployeeCode: (employeeCode: string) => Promise<void>
   signOut: () => void
   submitEmployeeScores: (
@@ -165,7 +158,6 @@ export const useCompStore = create<CompState>()(
       demoAccounts: [],
       isLoading: false,
       error: null,
-      ssoDebug: null,
       hasHydrated: false,
       setHasHydrated: (value) => set({ hasHydrated: value }),
 
@@ -187,8 +179,7 @@ export const useCompStore = create<CompState>()(
             set({ isLoading: true, error: null })
             try {
               const redirect = await handleMicrosoftRedirect()
-              if (redirect?.idToken) {
-                setSsoAccessToken(redirect.idToken)
+              if (redirect?.account) {
                 microsoftReady = true
                 if (
                   typeof window !== 'undefined' &&
@@ -200,11 +191,7 @@ export const useCompStore = create<CompState>()(
               } else {
                 const account = await getActiveMicrosoftAccount()
                 if (account) {
-                  const token = await getMicrosoftAuthToken(getSsoAccessToken())
-                  if (token) {
-                    setSsoAccessToken(token)
-                    microsoftReady = true
-                  }
+                  microsoftReady = true
                 }
               }
             } catch (error) {
@@ -237,15 +224,15 @@ export const useCompStore = create<CompState>()(
           }
           try {
             if (microsoftReady) {
-              setDemoUserId(null)
-              setOrgEmployeeCode(null)
-              try {
-                const ssoDebug = await collectSsoDebugDump()
-                console.log('[SSO debug]', formatSsoDebugDump(ssoDebug))
-                set({ ssoDebug })
-              } catch (debugError) {
-                console.error('[SSO debug] Failed to capture SSO details', debugError)
+              const employeeId = await fetchGraphEmployeeId()
+              setSsoAccessToken(null)
+              const identity =
+                await establishSessionFromEmployeeCode(employeeId)
+              if (identity.accessToken) {
+                setSsoAccessToken(identity.accessToken)
               }
+              setDemoUserId(identity.user.id)
+              setOrgEmployeeCode(identity.user.id)
               const me = await fetchMe()
               set(await buildApiWorkspace(me))
               return
@@ -404,7 +391,6 @@ export const useCompStore = create<CompState>()(
           assessments: USE_API ? [] : createInitialAssessments(),
           adminRows: [],
           error: null,
-          ssoDebug: null,
         })
       },
 
