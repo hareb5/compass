@@ -175,7 +175,7 @@ export function LoginScreen() {
                 placeholder="e.g. E12345"
                 autoComplete="username"
                 inputMode="text"
-                maxLength={32}
+                maxLength={64}
                 disabled={busy}
               />
               <p className="text-xs text-muted-foreground">

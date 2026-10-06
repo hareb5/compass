@@ -1,6 +1,6 @@
 import type { AssessmentRecord, MockUser, Role } from '#/lib/mock-data'
 import { USE_API } from '#/lib/config'
-import { ApiError, apiFetch } from '#/lib/api'
+import { apiFetch } from '#/lib/api'
 
 /** Raw row from the HR / org employees API. */
 export type OrgEmployee = {
@@ -161,19 +161,10 @@ export async function establishSessionFromEmployeeCode(
   employeeCode: string,
 ): Promise<OrgIdentity> {
   if (USE_API) {
-    try {
-      return await apiFetch<OrgIdentity>('/api/session/employee-code', {
-        method: 'POST',
-        body: JSON.stringify({ employeeCode }),
-      })
-    } catch (error) {
-      if (error instanceof ApiError) {
-        const shouldFallback = error.status === 502 || error.status === 503
-        if (!shouldFallback) {
-          throw error
-        }
-      }
-    }
+    return apiFetch<OrgIdentity>('/api/session/employee-code', {
+      method: 'POST',
+      body: JSON.stringify({ employeeCode }),
+    })
   }
 
   const employees = await fetchOrgEmployeesViaProxy()

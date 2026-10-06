@@ -7,7 +7,7 @@ const { signSessionToken } = require("../services/sessionToken");
 const { sendError } = require("../utils/httpError");
 
 const router = express.Router();
-const MAX_EMPLOYEE_CODE_LENGTH = 32;
+const MAX_EMPLOYEE_CODE_LENGTH = 64;
 
 router.post("/employee-code", async (req, res) => {
   if (!orgApi.isConfigured) {
@@ -41,6 +41,7 @@ router.post("/employee-code", async (req, res) => {
     });
   } catch (error) {
     const status = error.status || 500;
+    console.error("[Org] Employee-code lookup failed:", error.message);
     if (status === 500) {
       return sendError(res, 500, "Failed to look up employee code.", error);
     }

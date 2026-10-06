@@ -27,10 +27,17 @@ const {
 } = require("./assessmentService");
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
+const ORG_FETCH_TIMEOUT_MS = 20_000;
 
 let cachedEmployees = null;
 let cachedAt = 0;
 let inflight = null;
+
+function directoryError(message, status) {
+  const error = new Error(message);
+  error.status = status;
+  return error;
+}
 
 function toPerson(code, name, role, reportsTo, row) {
   const person = {
@@ -55,7 +62,7 @@ function parseEmployeesPayload(payload) {
 
 async function fetchEmployeesFromSource() {
   if (!orgApi.isConfigured) {
-    throw new Error("Org directory is not configured.");
+    throw directoryError("Org directory is not configured on the server.", 503);
   }
 
   const headers = { Accept: "application/json" };
@@ -63,12 +70,35 @@ async function fetchEmployeesFromSource() {
     headers.Authorization = `Bearer ${orgApi.apiKey}`;
   }
 
-  const response = await fetch(orgApi.url, { headers });
-  if (!response.ok) {
-    throw new Error(`Org API failed (${response.status})`);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ORG_FETCH_TIMEOUT_MS);
+  let response;
+  try {
+    response = await fetch(orgApi.url, {
+      headers,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw directoryError("Org directory timed out. Try again.", 503);
+    }
+    throw directoryError("Could not reach the org directory.", 503);
+  } finally {
+    clearTimeout(timer);
   }
 
-  return parseEmployeesPayload(await response.json());
+  if (!response.ok) {
+    throw directoryError(
+      `Org directory request failed (${response.status}).`,
+      503,
+    );
+  }
+
+  try {
+    return parseEmployeesPayload(await response.json());
+  } catch {
+    throw directoryError("Org directory returned an unexpected response.", 503);
+  }
 }
 
 async function getEmployees() {
