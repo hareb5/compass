@@ -64,14 +64,6 @@ function extractEmployeeCode(payload) {
   return typeof raw === "string" ? raw.trim() : "";
 }
 
-function isEmailDomainAllowed(email) {
-  if (azureAuth.allowedEmailDomains.length === 0) return true;
-  const atIndex = email.lastIndexOf("@");
-  if (atIndex === -1) return false;
-  const domain = email.slice(atIndex + 1);
-  return azureAuth.allowedEmailDomains.includes(domain);
-}
-
 async function verifyBearerToken(token) {
   const { jwtVerify, decodeJwt } = await loadJose();
   const clientId = azureAuth.clientId;
@@ -124,10 +116,6 @@ async function verifyBearerToken(token) {
   if (!email) {
     throw new Error("Token does not contain a user email.");
   }
-  if (!isEmailDomainAllowed(email)) {
-    throw new Error("Email domain is not allowed.");
-  }
-
   return {
     oid: typeof payload.oid === "string" ? payload.oid : "",
     email,
