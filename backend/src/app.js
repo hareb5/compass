@@ -1,7 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
-const rateLimit = require("express-rate-limit");
+const { rateLimit, ipKeyGenerator } = require("express-rate-limit");
 
 const compRoutes = require("./routes/compRoutes");
 const sessionRoutes = require("./routes/sessionRoutes");
@@ -76,11 +76,27 @@ app.get("/health", (_req, res) => {
   res.status(200).json({ status: "ok" });
 });
 
+/** Some proxies append the client port ("1.2.3.4:5678" or "[::1]:5678"). */
+function stripPort(ip) {
+  if (typeof ip !== "string") return "";
+  const value = ip.trim();
+  const bracketed = value.match(/^\[([^\]]+)\](?::\d+)?$/);
+  if (bracketed) return bracketed[1];
+  const ipv4WithPort = value.match(/^(\d{1,3}(?:\.\d{1,3}){3}):\d+$/);
+  if (ipv4WithPort) return ipv4WithPort[1];
+  return value;
+}
+
+function clientKey(req) {
+  return ipKeyGenerator(stripPort(req.ip) || "unknown");
+}
+
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 300,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: clientKey,
   message: { message: "Too many requests. Try again later." },
 });
 
@@ -89,6 +105,7 @@ const loginLimiter = rateLimit({
   limit: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: clientKey,
   message: { message: "Too many sign-in attempts. Try again later." },
 });
 
