@@ -170,3 +170,15 @@ export async function establishSessionFromEmployeeCode(
   const employees = await fetchOrgEmployeesViaProxy()
   return resolveOrgIdentity(employees, employeeCode)
 }
+
+/** Microsoft sign-in: the backend verifies the ID token (used for admin emails). */
+export function establishSessionFromMicrosoft(
+  employeeCode: string,
+  idToken: string,
+): Promise<OrgIdentity> {
+  return apiFetch<OrgIdentity>('/api/session/microsoft', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ employeeCode }),
+  })
+}

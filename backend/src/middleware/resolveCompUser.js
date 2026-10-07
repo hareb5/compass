@@ -2,6 +2,7 @@ const azureAuth = require("../config/azureAuth");
 const orgApi = require("../config/orgApi");
 const CompUser = require("../models/CompUser");
 const { USER_ROLES } = require("../constants/userRoles");
+const { isAdminEmail } = require("../config/adminAccess");
 const { serializeUser } = require("../services/orgHierarchy");
 const { provisionCompUserFromAuth } = require("../services/orgDirectory");
 const { isPlaceholderEmail } = require("../services/orgFields");
@@ -83,6 +84,15 @@ async function resolveCompUser(req, res, next) {
         return res.status(403).json({
           message: "User is not registered in SOBHA COMPASS.",
         });
+      }
+
+      if (
+        email &&
+        isAdminEmail(email) &&
+        user.role !== USER_ROLES.ADMIN
+      ) {
+        user.role = USER_ROLES.ADMIN;
+        await user.save();
       }
 
       if (

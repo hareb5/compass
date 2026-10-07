@@ -1,11 +1,7 @@
 import { Link, useRouterState } from '@tanstack/react-router'
 import { Button } from '#/components/ui/button'
 import { SHOW_DEMO } from '#/lib/config'
-import {
-  getActiveMicrosoftAccount,
-  isMsalConfigured,
-  logoutMicrosoft,
-} from '#/lib/msal-auth'
+import { isMicrosoftSession, logoutMicrosoft } from '#/lib/msal-auth'
 import { useCompStore } from '#/store/comp-store'
 import { LogOut, RotateCcw } from 'lucide-react'
 
@@ -20,17 +16,14 @@ export default function Header() {
   const isAdmin = currentUser?.role === 'admin'
 
   const handleSignOut = async () => {
+    const wasMicrosoftSession = isMicrosoftSession()
+    signOut()
+    if (!wasMicrosoftSession) return
+
     try {
-      if (isMsalConfigured()) {
-        const account = await getActiveMicrosoftAccount()
-        if (account) {
-          await logoutMicrosoft(account)
-        }
-      }
+      await logoutMicrosoft()
     } catch (error) {
       console.error('[Auth] Microsoft logout failed:', error)
-    } finally {
-      signOut()
     }
   }
 

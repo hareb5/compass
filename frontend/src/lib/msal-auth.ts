@@ -4,6 +4,8 @@ import type {
   RedirectRequest,
 } from '@azure/msal-browser'
 
+import { MS_SESSION_KEY } from '#/lib/config'
+
 const clientId = import.meta.env.VITE_MSAL_CLIENT_ID?.trim() ?? ''
 const tenantId = import.meta.env.VITE_MSAL_TENANT_ID?.trim() ?? ''
 const redirectUri =
@@ -154,6 +156,20 @@ export async function acquireMicrosoftTokens(
   }
 }
 
+export function isMicrosoftSession(): boolean {
+  if (typeof window === 'undefined') return false
+  return sessionStorage.getItem(MS_SESSION_KEY) === '1'
+}
+
+export function setMicrosoftSession(active: boolean) {
+  if (typeof window === 'undefined') return
+  if (active) {
+    sessionStorage.setItem(MS_SESSION_KEY, '1')
+  } else {
+    sessionStorage.removeItem(MS_SESSION_KEY)
+  }
+}
+
 export async function loginWithMicrosoft() {
   ensureMsalConfigured()
   const msalInstance = await getMsalInstance()
@@ -164,7 +180,12 @@ export async function loginWithMicrosoft() {
   await msalInstance.loginRedirect(loginRequest)
 }
 
-export async function logoutMicrosoft(account?: AccountInfo | null) {
+/**
+ * Ends the Microsoft session. No account hint is passed on purpose, so
+ * Microsoft shows its account picker instead of silently signing out.
+ */
+export async function logoutMicrosoft() {
+  setMicrosoftSession(false)
   if (!isMsalConfigured() || typeof window === 'undefined') {
     return
   }
@@ -174,8 +195,8 @@ export async function logoutMicrosoft(account?: AccountInfo | null) {
     return
   }
 
+  msalInstance.setActiveAccount(null)
   await msalInstance.logoutRedirect({
-    account: account ?? msalInstance.getActiveAccount() ?? undefined,
     postLogoutRedirectUri: redirectUri || window.location.origin,
   })
 }

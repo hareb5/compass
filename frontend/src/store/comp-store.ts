@@ -16,8 +16,11 @@ import {
   fetchGraphEmployeeId,
   formatMsalError,
   getActiveMicrosoftAccount,
+  getMicrosoftAuthToken,
   handleMicrosoftRedirect,
+  isMicrosoftSession,
   isMsalConfigured,
+  setMicrosoftSession,
 } from '#/lib/msal-auth'
 import {
   fetchAdminAssessments,
@@ -30,7 +33,10 @@ import {
   type AdminAssessmentRow,
   type MeResponse,
 } from '#/lib/comp-api'
-import { establishSessionFromEmployeeCode } from '#/lib/org-directory'
+import {
+  establishSessionFromEmployeeCode,
+  establishSessionFromMicrosoft,
+} from '#/lib/org-directory'
 
 type SessionKind = 'none' | 'mock' | 'api' | 'org'
 
@@ -181,6 +187,7 @@ export const useCompStore = create<CompState>()(
               const redirect = await handleMicrosoftRedirect()
               if (redirect?.account) {
                 microsoftReady = true
+                setMicrosoftSession(true)
                 if (
                   typeof window !== 'undefined' &&
                   window.location.pathname !== '/'
@@ -188,7 +195,9 @@ export const useCompStore = create<CompState>()(
                   window.location.replace('/')
                   return
                 }
-              } else {
+              } else if (isMicrosoftSession()) {
+                // Only resume Microsoft while this tab still has a Microsoft
+                // session; after sign-out MSAL's cached account is ignored.
                 const account = await getActiveMicrosoftAccount()
                 if (account) {
                   microsoftReady = true
@@ -226,8 +235,14 @@ export const useCompStore = create<CompState>()(
             if (microsoftReady) {
               const employeeId = await fetchGraphEmployeeId()
               setSsoAccessToken(null)
-              const identity =
-                await establishSessionFromEmployeeCode(employeeId)
+              const idToken = await getMicrosoftAuthToken()
+              if (!idToken) {
+                throw new Error('Microsoft sign-in expired. Sign in again.')
+              }
+              const identity = await establishSessionFromMicrosoft(
+                employeeId,
+                idToken,
+              )
               if (identity.accessToken) {
                 setSsoAccessToken(identity.accessToken)
               }
@@ -256,6 +271,7 @@ export const useCompStore = create<CompState>()(
             setDemoUserId(null)
             setSsoAccessToken(null)
             setOrgEmployeeCode(null)
+            setMicrosoftSession(false)
             set({
               currentUser: null,
               sessionKind: 'none',
