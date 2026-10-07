@@ -2,7 +2,7 @@ const azureAuth = require("../config/azureAuth");
 const orgApi = require("../config/orgApi");
 const CompUser = require("../models/CompUser");
 const { USER_ROLES } = require("../constants/userRoles");
-const { isAdminEmail } = require("../config/adminAccess");
+const { isAdminEmail, isAdminEmployeeCode } = require("../config/adminAccess");
 const { serializeUser } = require("../services/orgHierarchy");
 const { provisionCompUserFromAuth } = require("../services/orgDirectory");
 const { isPlaceholderEmail } = require("../services/orgFields");
@@ -21,6 +21,15 @@ async function findRegisteredUser({ employeeCode, email }) {
   }
 
   return null;
+}
+
+/** Admin = admin-only account, or an email / employee code listed in the env. */
+function hasAdminAccess(user, authEmail) {
+  return (
+    user.role === USER_ROLES.ADMIN ||
+    isAdminEmail(authEmail) ||
+    isAdminEmployeeCode(user.employeeCode)
+  );
 }
 
 async function resolveCompUser(req, res, next) {
@@ -87,15 +96,6 @@ async function resolveCompUser(req, res, next) {
       }
 
       if (
-        email &&
-        isAdminEmail(email) &&
-        user.role !== USER_ROLES.ADMIN
-      ) {
-        user.role = USER_ROLES.ADMIN;
-        await user.save();
-      }
-
-      if (
         req.auth?.source === "microsoft" &&
         email &&
         isPlaceholderEmail(user.email)
@@ -106,6 +106,7 @@ async function resolveCompUser(req, res, next) {
     }
 
     req.compUser = user;
+    req.isAdmin = hasAdminAccess(user, req.auth?.email);
     return next();
   } catch (error) {
     if (error.status && error.status < 500) {
@@ -116,7 +117,7 @@ async function resolveCompUser(req, res, next) {
 }
 
 async function requireAdmin(req, res, next) {
-  if (req.compUser?.role !== USER_ROLES.ADMIN) {
+  if (!req.isAdmin) {
     return res.status(403).json({
       message: "Admin access required.",
     });
@@ -142,9 +143,10 @@ async function requireEmployee(req, res, next) {
   return next();
 }
 
-function attachMePayload(user, reports) {
+function attachMePayload(user, reports, isAdmin) {
   return {
     ...serializeUser(user),
+    isAdmin: Boolean(isAdmin),
     reports: reports.map(serializeUser),
   };
 }

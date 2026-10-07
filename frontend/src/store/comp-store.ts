@@ -148,6 +148,20 @@ async function buildApiWorkspace(me: MeResponse): Promise<Partial<CompState>> {
     }
   }
 
+  // Employees/managers listed as admins keep their scoring page and also get
+  // the dashboard data. It is stored separately so it never replaces their own
+  // assessments.
+  if (me.isAdmin && me.role !== 'admin') {
+    try {
+      const admin = await fetchAdminAssessments()
+      const adminData = applyAdminRows(admin.assessments)
+      next.adminRows = adminData.adminRows
+      next.usersById = { ...adminData.usersById, ...next.usersById }
+    } catch (error) {
+      console.error('[Admin] Failed to load admin dashboard data:', error)
+    }
+  }
+
   return next
 }
 

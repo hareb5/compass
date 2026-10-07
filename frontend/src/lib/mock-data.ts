@@ -15,6 +15,12 @@ export type MockUser = Person & {
   role: Role
   /** For managers: employees they can score. For employees: unused. */
   reportsTo?: string
+  /** Employee/manager who can also open the admin dashboard. */
+  isAdmin?: boolean
+}
+
+export function hasAdminAccess(user: MockUser | null | undefined): boolean {
+  return user?.role === 'admin' || user?.isAdmin === true
 }
 
 export type AssessmentRecord = {

@@ -1,7 +1,6 @@
 const CompUser = require("../models/CompUser");
 const CompAssessment = require("../models/CompAssessment");
 const { USER_ROLES } = require("../constants/userRoles");
-const { isAdminEmployeeCode, isAdminEmail } = require("../config/adminAccess");
 const {
   normalizeCode,
   placeholderEmail,
@@ -19,13 +18,6 @@ async function findUserByCode(code) {
   });
 }
 
-function resolveRole(code, email, fallbackRole) {
-  if (isAdminEmployeeCode(code) || isAdminEmail(email)) {
-    return USER_ROLES.ADMIN;
-  }
-  return fallbackRole;
-}
-
 async function upsertPerson({
   code,
   name,
@@ -38,7 +30,9 @@ async function upsertPerson({
   if (!normalizedCode) return null;
 
   const safeEmail = (email || placeholderEmail(normalizedCode)).toLowerCase();
-  const resolvedRole = resolveRole(normalizedCode, safeEmail, role);
+  // Admin access is a separate flag (see resolveCompUser); it must not replace
+  // the person's employee/manager role, or they lose their scoring page.
+  const resolvedRole = role;
   const safeTitle =
     title ||
     (resolvedRole === USER_ROLES.MANAGER ? "Manager" : "Employee");

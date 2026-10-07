@@ -62,11 +62,14 @@ export function AdminDashboard() {
   const adminRows = useCompStore((s) => s.adminRows)
   const getUser = useCompStore((s) => s.getUser)
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(
-    () => assessments[0]?.employeeId ?? '',
+    () =>
+      (USE_API ? adminRows[0]?.employeeId : undefined) ??
+      assessments[0]?.employeeId ??
+      '',
   )
 
   const rows = useMemo(() => {
-    if (USE_API && adminRows.length > 0) {
+    if (USE_API) {
       return adminRows.map((record) => ({
         record,
         employee: record.employee ?? getUser(record.employeeId),

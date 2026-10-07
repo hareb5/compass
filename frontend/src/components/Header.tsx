@@ -1,6 +1,7 @@
 import { Link, useRouterState } from '@tanstack/react-router'
 import { Button } from '#/components/ui/button'
 import { SHOW_DEMO } from '#/lib/config'
+import { hasAdminAccess } from '#/lib/mock-data'
 import { isMicrosoftSession, logoutMicrosoft } from '#/lib/msal-auth'
 import { useCompStore } from '#/store/comp-store'
 import { LogOut, RotateCcw } from 'lucide-react'
@@ -13,7 +14,10 @@ export default function Header() {
     select: (state) => state.location.pathname,
   })
   const isAdminRoute = pathname.startsWith('/admin')
-  const isAdmin = currentUser?.role === 'admin'
+  const isAdmin = hasAdminAccess(currentUser)
+  // Admin-only accounts already land on the dashboard, so the switcher would
+  // just point at the same page.
+  const showAdminSwitch = isAdmin && currentUser?.role !== 'admin'
 
   const handleSignOut = async () => {
     const wasMicrosoftSession = isMicrosoftSession()
@@ -51,15 +55,17 @@ export default function Header() {
         <div className="flex shrink-0 items-center gap-2">
           {isAdmin ? (
             <>
-              {!isAdminRoute ? (
-                <Button variant="outline" size="sm" asChild>
-                  <Link to="/admin">Admin dashboard</Link>
-                </Button>
-              ) : (
-                <Button variant="outline" size="sm" asChild>
-                  <Link to="/">Scoring home</Link>
-                </Button>
-              )}
+              {showAdminSwitch ? (
+                !isAdminRoute ? (
+                  <Button variant="outline" size="sm" asChild>
+                    <Link to="/admin">Admin dashboard</Link>
+                  </Button>
+                ) : (
+                  <Button variant="outline" size="sm" asChild>
+                    <Link to="/">Scoring home</Link>
+                  </Button>
+                )
+              ) : null}
               {SHOW_DEMO ? (
                 <Button
                   variant="outline"

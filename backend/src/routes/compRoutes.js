@@ -57,7 +57,7 @@ router.get("/me", resolveCompUser, async (req, res) => {
       reports = await getReportsFor(user._id);
     }
 
-    return res.json(attachMePayload(user, reports));
+    return res.json(attachMePayload(user, reports, req.isAdmin));
   } catch (error) {
     return sendError(res, 500, "Failed to load profile.", error);
   }
