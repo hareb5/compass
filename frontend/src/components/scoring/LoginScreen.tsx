@@ -144,56 +144,52 @@ export function LoginScreen() {
             </p>
           ) : null}
 
-          <form className="relative mt-8 space-y-3" onSubmit={handleEmployeeCodeSubmit}>
-            {microsoftEnabled ? (
-              <div className="mb-3 flex items-center gap-3">
-                <div className="h-px flex-1 bg-border" />
-                <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                  or employee code
-                </p>
-                <div className="h-px flex-1 bg-border" />
-              </div>
-            ) : null}
-            <div hidden aria-hidden="true">
-              <label htmlFor="company-website">Company website</label>
-              <input
-                id="company-website"
-                name="companyWebsite"
-                tabIndex={-1}
-                autoComplete="off"
-                value={honeypot}
-                onChange={(event) => setHoneypot(event.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="employee-code">Employee code</Label>
-              <Input
-                id="employee-code"
-                name="employeeCode"
-                value={employeeCode}
-                onChange={(event) => setEmployeeCode(event.target.value)}
-                placeholder="e.g. E12345"
-                autoComplete="username"
-                inputMode="text"
-                maxLength={64}
-                disabled={busy}
-              />
-              <p className="text-xs text-muted-foreground">
-                If this code is an L1 manager for others, you score that team.
-                Otherwise you only rate yourself.
-              </p>
-            </div>
-            <Button
-              type="submit"
-              className="w-full min-h-11"
-              size="lg"
-              disabled={busy || !employeeCode.trim()}
+          {!microsoftEnabled ? (
+            <form
+              className="relative mt-8 space-y-3"
+              onSubmit={handleEmployeeCodeSubmit}
             >
-              {isLoading && !isAuthRedirecting
-                ? 'Checking directory…'
-                : 'Continue'}
-            </Button>
-          </form>
+              <div hidden aria-hidden="true">
+                <label htmlFor="company-website">Company website</label>
+                <input
+                  id="company-website"
+                  name="companyWebsite"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  value={honeypot}
+                  onChange={(event) => setHoneypot(event.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="employee-code">Employee code</Label>
+                <Input
+                  id="employee-code"
+                  name="employeeCode"
+                  value={employeeCode}
+                  onChange={(event) => setEmployeeCode(event.target.value)}
+                  placeholder="e.g. E12345"
+                  autoComplete="username"
+                  inputMode="text"
+                  maxLength={64}
+                  disabled={busy}
+                />
+                <p className="text-xs text-muted-foreground">
+                  If this code is an L1 manager for others, you score that team.
+                  Otherwise you only rate yourself.
+                </p>
+              </div>
+              <Button
+                type="submit"
+                className="w-full min-h-11"
+                size="lg"
+                disabled={busy || !employeeCode.trim()}
+              >
+                {isLoading && !isAuthRedirecting
+                  ? 'Checking directory…'
+                  : 'Continue'}
+              </Button>
+            </form>
+          ) : null}
 
           {SHOW_DEMO ? (
             <>
