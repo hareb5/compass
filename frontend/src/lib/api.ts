@@ -72,13 +72,10 @@ export async function apiFetch<T>(
     let message =
       typeof payload.message === 'string' ? payload.message.trim() : ''
     if (!message) {
-      if (response.status === 502) {
-        message =
-          'Bad gateway: nginx could not reach the API. Confirm pm2 is running and /api is proxied to the backend port.'
-      } else if (response.status === 503) {
-        message = 'The org directory is unavailable. Check ORG_API_URL on the backend.'
+      if (response.status === 502 || response.status === 503) {
+        message = 'The service is temporarily unavailable. Try again shortly.'
       } else {
-        message = `Request failed (${response.status})`
+        message = 'Something went wrong. Try again.'
       }
     }
     throw new ApiError(message, response.status)

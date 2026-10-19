@@ -14,6 +14,14 @@ export type Competency = {
   description: string
 }
 
+export const PROFICIENCY_LEVELS = [
+  { level: 1, label: 'Just learning, needs guidance' },
+  { level: 2, label: 'Can perform basic tasks with support' },
+  { level: 3, label: 'Can handle responsibilities independently' },
+  { level: 4, label: 'Highly skilled, can mentor others' },
+  { level: 5, label: 'Expert, sets standards and best practices' },
+] as const
+
 export const COMPETENCIES: Competency[] = [
   {
     id: 'communication',

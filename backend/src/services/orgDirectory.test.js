@@ -5,6 +5,25 @@ const { pickEmail, placeholderEmail, isActiveEmployee } = require("./orgFields")
 
 const EMPLOYEES = [
   {
+    EMPLOYEE_CODE: "D1",
+    EMPLOYEE_NAME: "Sara Director",
+    L1_MANAGER_CODE: "",
+    L1_MANAGER_NAME: "",
+    EmpStatus: "Active",
+    EMAIL: "sara.director@sobha.com",
+    DEPARTMENT: "Technology",
+  },
+  {
+    EMPLOYEE_CODE: "M10",
+    EMPLOYEE_NAME: "Omar Khalid",
+    L1_MANAGER_CODE: "D1",
+    L1_MANAGER_NAME: "Sara Director",
+    EmpStatus: "Active",
+    EMAIL: "omar.khalid@sobha.com",
+    DEPARTMENT: "Technology",
+    DESIGNATION: "Engineering Manager",
+  },
+  {
     EMPLOYEE_CODE: "E100",
     EMPLOYEE_NAME: "Ahmed Hassan",
     L1_MANAGER_CODE: "M10",
@@ -37,12 +56,42 @@ describe("resolveOrgIdentity", () => {
     const identity = resolveOrgIdentity(EMPLOYEES, "M10");
     assert.equal(identity.user.role, "manager");
     assert.equal(identity.user.id, "M10");
+    assert.equal(identity.user.reportsTo, "D1");
     assert.deepEqual(
       identity.reports.map((report) => report.id).sort(),
       ["E100", "E101"],
     );
-    assert.equal(identity.assessments.length, 2);
+    assert.equal(identity.assessments.length, 3);
     assert.equal(identity.reports[0].reportsTo, "M10");
+  });
+
+  it("gives a mid-level manager a self assessment plus their team", () => {
+    const identity = resolveOrgIdentity(EMPLOYEES, "M10");
+    const selfAssessment = identity.assessments.find(
+      (record) => record.employeeId === "M10",
+    );
+    assert.ok(selfAssessment);
+    assert.equal(selfAssessment.managerId, "D1");
+    assert.deepEqual(
+      identity.assessments
+        .filter((record) => record.employeeId !== "M10")
+        .map((record) => record.employeeId)
+        .sort(),
+      ["E100", "E101"],
+    );
+  });
+
+  it("lets a top-level manager score mid-level managers without a self test", () => {
+    const identity = resolveOrgIdentity(EMPLOYEES, "D1");
+    assert.equal(identity.user.role, "manager");
+    assert.equal(identity.user.reportsTo, undefined);
+    assert.equal(identity.reports.length, 1);
+    assert.equal(identity.reports[0].id, "M10");
+    assert.equal(identity.reports[0].role, "manager");
+    assert.equal(
+      identity.assessments.some((record) => record.employeeId === "D1"),
+      false,
+    );
   });
 
   it("treats a directory employee as an employee linked to their boss", () => {

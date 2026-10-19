@@ -1,4 +1,5 @@
-import { COMPETENCIES, type CompetencyId, type ScoreMap } from '#/lib/competencies'
+import { COMPETENCIES, PROFICIENCY_LEVELS } from '#/lib/competencies'
+import type { CompetencyId, ScoreMap } from '#/lib/competencies'
 import { cn } from '#/lib/utils'
 import { Button } from '#/components/ui/button'
 
@@ -6,9 +7,15 @@ type ScorePickerProps = {
   scores: ScoreMap
   onChange: (competencyId: CompetencyId, value: number) => void
   disabled?: boolean
+  showProficiencyHints?: boolean
 }
 
-export function ScorePicker({ scores, onChange, disabled }: ScorePickerProps) {
+export function ScorePicker({
+  scores,
+  onChange,
+  disabled,
+  showProficiencyHints = false,
+}: ScorePickerProps) {
   return (
     <div className="space-y-4">
       {COMPETENCIES.map((competency) => {
@@ -32,22 +39,29 @@ export function ScorePicker({ scores, onChange, disabled }: ScorePickerProps) {
               </p>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
-              {[1, 2, 3, 4, 5].map((option) => {
-                const selected = value === option
+              {PROFICIENCY_LEVELS.map((level) => {
+                const selected = value === level.level
+                const hint = `Proficiency ${level.level}: ${level.label}`
                 return (
                   <Button
-                    key={option}
+                    key={level.level}
                     type="button"
                     size="sm"
                     variant={selected ? 'default' : 'outline'}
                     disabled={disabled}
+                    title={showProficiencyHints ? hint : undefined}
+                    aria-label={
+                      showProficiencyHints
+                        ? `${competency.name}, ${hint}`
+                        : undefined
+                    }
                     className={cn(
                       'min-h-11 min-w-11 tabular-nums',
                       selected && 'shadow-sm',
                     )}
-                    onClick={() => onChange(competency.id, option)}
+                    onClick={() => onChange(competency.id, level.level)}
                   >
-                    {option}
+                    {level.level}
                   </Button>
                 )
               })}

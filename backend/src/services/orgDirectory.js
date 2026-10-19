@@ -15,6 +15,7 @@ const {
   persistResolvedIdentity,
   findOrgCodeForEmail,
   upsertPerson,
+  ensureAssessment,
 } = require("./orgSync");
 const {
   serializeUser,
@@ -52,17 +53,44 @@ function toPerson(code, name, role, reportsTo, row) {
   return person;
 }
 
+function hasActiveReports(employees, code) {
+  return employees.some(
+    (row) =>
+      normalizeCode(row.L1_MANAGER_CODE) === code && isActiveEmployee(row),
+  );
+}
+
+function ownManagerCode(selfRow, code) {
+  const managerCode = normalizeCode(selfRow?.L1_MANAGER_CODE);
+  if (!managerCode || managerCode === code) return undefined;
+  return managerCode;
+}
+
+function emptyAssessment(employeeId, managerId) {
+  return {
+    employeeId,
+    managerId,
+    employeeScores: null,
+    managerScores: null,
+    employeeSubmittedAt: null,
+    managerSubmittedAt: null,
+  };
+}
+
 function parseEmployeesPayload(payload) {
   if (Array.isArray(payload)) return payload;
   if (payload && typeof payload === "object" && Array.isArray(payload.employees)) {
     return payload.employees;
   }
-  throw new Error('Org API response missing an "employees" array.');
+  throw new Error("The employee directory returned an unexpected response.");
 }
 
 async function fetchEmployeesFromSource() {
   if (!orgApi.isConfigured) {
-    throw directoryError("Org directory is not configured on the server.", 503);
+    throw directoryError(
+      "The employee directory is unavailable. Try again later.",
+      503,
+    );
   }
 
   const headers = { Accept: "application/json" };
@@ -80,16 +108,19 @@ async function fetchEmployeesFromSource() {
     });
   } catch (error) {
     if (error?.name === "AbortError") {
-      throw directoryError("Org directory timed out. Try again.", 503);
+      throw directoryError("The employee directory timed out. Try again.", 503);
     }
-    throw directoryError("Could not reach the org directory.", 503);
+    throw directoryError(
+      "Could not reach the employee directory. Try again shortly.",
+      503,
+    );
   } finally {
     clearTimeout(timer);
   }
 
   if (!response.ok) {
     throw directoryError(
-      `Org directory request failed (${response.status}).`,
+      "The employee directory is unavailable. Try again shortly.",
       503,
     );
   }
@@ -97,7 +128,10 @@ async function fetchEmployeesFromSource() {
   try {
     return parseEmployeesPayload(await response.json());
   } catch {
-    throw directoryError("Org directory returned an unexpected response.", 503);
+    throw directoryError(
+      "The employee directory returned an unexpected response.",
+      503,
+    );
   }
 }
 
@@ -144,24 +178,24 @@ function resolveOrgIdentity(employees, employeeCode) {
       normalizeCode(selfRow?.EMPLOYEE_NAME) ||
       normalizeCode(reportRows[0]?.L1_MANAGER_NAME) ||
       code;
-    const user = toPerson(code, managerName, "manager", undefined, selfRow);
-    const reports = reportRows.map((row) =>
-      toPerson(
-        normalizeCode(row.EMPLOYEE_CODE),
+    const reportsTo = ownManagerCode(selfRow, code);
+    const user = toPerson(code, managerName, "manager", reportsTo, selfRow);
+    const reports = reportRows.map((row) => {
+      const reportCode = normalizeCode(row.EMPLOYEE_CODE);
+      return toPerson(
+        reportCode,
         normalizeCode(row.EMPLOYEE_NAME),
-        "employee",
+        hasActiveReports(employees, reportCode)
+          ? USER_ROLES.MANAGER
+          : USER_ROLES.EMPLOYEE,
         code,
         row,
-      ),
-    );
-    const assessments = reports.map((report) => ({
-      employeeId: report.id,
-      managerId: code,
-      employeeScores: null,
-      managerScores: null,
-      employeeSubmittedAt: null,
-      managerSubmittedAt: null,
-    }));
+      );
+    });
+    const assessments = [
+      ...(reportsTo ? [emptyAssessment(code, reportsTo)] : []),
+      ...reports.map((report) => emptyAssessment(report.id, code)),
+    ];
     return { user, reports, assessments };
   }
 
@@ -173,25 +207,51 @@ function resolveOrgIdentity(employees, employeeCode) {
     throw error;
   }
 
-  const managerCode = normalizeCode(selfRow.L1_MANAGER_CODE);
+  const managerCode = ownManagerCode(selfRow, code);
   const user = toPerson(
     code,
     normalizeCode(selfRow.EMPLOYEE_NAME),
     "employee",
-    managerCode || undefined,
+    managerCode,
     selfRow,
   );
-  const assessments = [
-    {
-      employeeId: code,
-      managerId: managerCode,
-      employeeScores: null,
-      managerScores: null,
-      employeeSubmittedAt: null,
-      managerSubmittedAt: null,
-    },
-  ];
+  const assessments = [emptyAssessment(code, managerCode || "")];
   return { user, reports: [], assessments };
+}
+
+async function serializeOwnAssessmentForUser(user) {
+  const boss =
+    user.managerRef && user.managerRef.externalId
+      ? user.managerRef
+      : user.managerRef
+        ? await CompUser.findById(user.managerRef)
+        : null;
+  if (!boss) return null;
+
+  let assessment = await CompAssessment.findOne({
+    employeeRef: user._id,
+  })
+    .populate("employeeRef")
+    .populate("managerRef");
+
+  if (!assessment) {
+    assessment = await ensureAssessment(user, boss);
+    if (assessment?._id) {
+      assessment = await CompAssessment.findById(assessment._id)
+        .populate("employeeRef")
+        .populate("managerRef");
+    }
+  }
+
+  if (!assessment) return null;
+
+  return stripForEmployee(
+    serializeAssessmentBase({
+      ...assessment.toObject(),
+      employeeRef: assessment.employeeRef || user,
+      managerRef: assessment.managerRef || boss,
+    }),
+  );
 }
 
 async function serializeAssessmentForRole(assessment, viewer) {
@@ -243,15 +303,19 @@ async function buildIdentityFromUser(user) {
     })
       .populate("employeeRef")
       .populate("managerRef");
+    const ownAssessment = await serializeOwnAssessmentForUser(populated);
+    const teamAssessments = await Promise.all(
+      assessments.map((assessment) =>
+        serializeAssessmentForRole(assessment, populated),
+      ),
+    );
 
     return {
       user: serializedUser,
       reports: reports.map(serializeUser),
-      assessments: await Promise.all(
-        assessments.map((assessment) =>
-          serializeAssessmentForRole(assessment, populated),
-        ),
-      ),
+      assessments: ownAssessment
+        ? [ownAssessment, ...teamAssessments]
+        : teamAssessments,
     };
   }
 
@@ -335,4 +399,5 @@ module.exports = {
   provisionCompUserFromAuth,
   getEmployees,
   buildIdentityFromUser,
+  serializeOwnAssessmentForUser,
 };

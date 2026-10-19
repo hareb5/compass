@@ -78,7 +78,7 @@ async function verifyBearerToken(token) {
   try {
     unverified = decodeJwt(token);
   } catch {
-    throw new Error("Malformed token.");
+    throw new Error("Invalid or expired sign-in. Sign in again.");
   }
 
   const tokenTenantId =
@@ -87,16 +87,18 @@ async function verifyBearerToken(token) {
       : azureAuth.tenantId;
 
   if (!tokenTenantId) {
-    throw new Error("Token is missing tenant id (tid).");
+    throw new Error("Invalid or expired sign-in. Sign in again.");
   }
 
   if (azureAuth.tenantId && tokenTenantId !== azureAuth.tenantId) {
-    throw new Error("Token tenant does not match AZURE_TENANT_ID.");
+    throw new Error("Invalid or expired sign-in. Sign in again.");
   }
 
   const keySet = await getJwksForTenant(tokenTenantId);
   if (!keySet) {
-    throw new Error("Could not load Microsoft signing keys.");
+    throw new Error(
+      "Microsoft sign-in is temporarily unavailable. Try again shortly.",
+    );
   }
 
   const verifyOptions = {
@@ -114,13 +116,15 @@ async function verifyBearerToken(token) {
     ({ payload } = await jwtVerify(token, keySet, verifyOptions));
     const azp = typeof payload.azp === "string" ? payload.azp : "";
     if (!audienceMatches(payload, clientId) && azp !== clientId) {
-      throw new Error("Token audience mismatch.");
+      throw new Error("Invalid or expired sign-in. Sign in again.");
     }
   }
 
   const email = extractEmail(payload);
   if (!email) {
-    throw new Error("Token does not contain a user email.");
+    throw new Error(
+      "Your Microsoft account has no email. Sign in with a work account.",
+    );
   }
   return {
     oid: typeof payload.oid === "string" ? payload.oid : "",
@@ -168,7 +172,7 @@ async function requireMicrosoftAuth(req, res, next) {
   const token = readBearerToken(req);
   if (!token) {
     return res.status(401).json({
-      message: "Authorization Bearer token is required.",
+      message: "Sign in again.",
     });
   }
 
@@ -195,7 +199,7 @@ async function requireMicrosoftAuth(req, res, next) {
     return next();
   } catch (error) {
     return res.status(401).json({
-      message: error.message || "Invalid or expired token.",
+      message: error.message || "Invalid or expired sign-in. Sign in again.",
     });
   }
 }

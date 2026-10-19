@@ -16,7 +16,9 @@ const {
 const {
   getReportsFor,
   serializeUser,
+  canSubmitSelfScores,
 } = require("../services/orgHierarchy");
+const { serializeOwnAssessmentForUser } = require("../services/orgDirectory");
 const {
   serializeAssessmentBase,
   stripForEmployee,
@@ -108,9 +110,11 @@ router.get("/assessments/mine", resolveCompUser, async (req, res) => {
         employeeRef: { $in: reportIds },
         managerRef: user._id,
       }).populate("employeeRef");
+      const ownAssessment = await serializeOwnAssessmentForUser(user);
 
       return res.json({
         reports: reports.map(serializeUser),
+        assessment: ownAssessment,
         assessments: assessments.map((assessment) =>
           stripForManager(
             serializeAssessmentBase({
@@ -137,8 +141,11 @@ router.post(
   async (req, res) => {
     try {
       const user = req.compUser;
-      if (user.role !== USER_ROLES.EMPLOYEE) {
-        return res.status(403).json({ message: "Employee access required." });
+      if (!canSubmitSelfScores(user)) {
+        return res.status(403).json({
+          message:
+            "Self-assessment is only available if you report to a manager.",
+        });
       }
 
       if (req.params.employeeId !== user.externalId) {

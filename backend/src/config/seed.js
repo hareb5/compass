@@ -14,6 +14,16 @@ const SEED_USERS = [
     managerExternalId: null,
   },
   {
+    externalId: "dir-1",
+    name: "Hessa Al Suwaidi",
+    email: "hessa.director@sobha.com",
+    employeeCode: "DIR001",
+    title: "Director of Technology",
+    department: "Technology",
+    role: USER_ROLES.MANAGER,
+    managerExternalId: null,
+  },
+  {
     externalId: "mgr-1",
     name: "Omar Khalid",
     email: "omar.khalid@sobha.com",
@@ -21,7 +31,7 @@ const SEED_USERS = [
     title: "Engineering Manager",
     department: "Technology",
     role: USER_ROLES.MANAGER,
-    managerExternalId: null,
+    managerExternalId: "dir-1",
   },
   {
     externalId: "mgr-2",
@@ -90,6 +100,14 @@ function scores(communication, collaboration, results, innovation, accountabilit
 }
 
 const SEED_ASSESSMENTS = [
+  {
+    employeeExternalId: "mgr-1",
+    managerExternalId: "dir-1",
+    employeeScores: null,
+    managerScores: null,
+    employeeSubmittedAt: null,
+    managerSubmittedAt: null,
+  },
   {
     employeeExternalId: "emp-1",
     managerExternalId: "mgr-1",

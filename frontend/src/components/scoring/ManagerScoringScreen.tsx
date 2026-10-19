@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ProficiencyLegend } from '#/components/scoring/ProficiencyLegend'
 import { ScorePicker } from '#/components/scoring/ScorePicker'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
@@ -7,8 +8,9 @@ import {
   emptyScores,
   formatScore,
   isCompleteScores,
-  type ScoreMap,
 } from '#/lib/competencies'
+import type { ScoreMap } from '#/lib/competencies'
+import { canTakeSelfAssessment } from '#/lib/mock-data'
 import { surveyBackgroundStyle } from '#/lib/survey-constants'
 import { cn } from '#/lib/utils'
 import { setScoreValue, useCompStore } from '#/store/comp-store'
@@ -20,42 +22,63 @@ export function ManagerScoringScreen() {
   const reports = useCompStore((s) => s.reports)
   const getUser = useCompStore((s) => s.getUser)
   const submitManagerScores = useCompStore((s) => s.submitManagerScores)
+  const submitEmployeeScores = useCompStore((s) => s.submitEmployeeScores)
+  const needsSelfAssessment = canTakeSelfAssessment(currentUser)
 
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('')
 
   useEffect(() => {
-    if (reports.length > 0 && !selectedEmployeeId) {
+    if (selectedEmployeeId || !currentUser) return
+    if (needsSelfAssessment) {
+      setSelectedEmployeeId(currentUser.id)
+      return
+    }
+    if (reports.length > 0) {
       setSelectedEmployeeId(reports[0].id)
     }
-  }, [reports, selectedEmployeeId])
+  }, [currentUser, needsSelfAssessment, reports, selectedEmployeeId])
+
+  const isScoringSelf =
+    needsSelfAssessment && selectedEmployeeId === currentUser?.id
   const selectedRecord = assessments.find(
     (a) => a.employeeId === selectedEmployeeId,
   )
-  const alreadySubmitted = Boolean(selectedRecord?.managerScores)
+  const alreadySubmitted = isScoringSelf
+    ? Boolean(selectedRecord?.employeeScores)
+    : Boolean(selectedRecord?.managerScores)
 
   const [scores, setScores] = useState<ScoreMap>(emptyScores())
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
-    setScores(selectedRecord?.managerScores ?? emptyScores())
+    setScores(
+      (isScoringSelf
+        ? selectedRecord?.employeeScores
+        : selectedRecord?.managerScores) ?? emptyScores(),
+    )
     setSaved(false)
-  }, [selectedEmployeeId, selectedRecord?.managerScores])
+  }, [
+    selectedEmployeeId,
+    isScoringSelf,
+    selectedRecord?.employeeScores,
+    selectedRecord?.managerScores,
+  ])
 
   if (!currentUser || currentUser.role !== 'manager') return null
 
-  const selectedEmployee = getUser(selectedEmployeeId)
+  const selectedEmployee = isScoringSelf
+    ? currentUser
+    : getUser(selectedEmployeeId)
   const canSubmit =
     Boolean(selectedEmployeeId) &&
     isCompleteScores(scores) &&
     !alreadySubmitted
-  const managerAverage = isCompleteScores(scores) ? averageScore(scores) : null
+  const scoreAverage = isCompleteScores(scores) ? averageScore(scores) : null
 
   const handleSubmit = async () => {
-    const ok = await submitManagerScores(
-      currentUser.id,
-      selectedEmployeeId,
-      scores,
-    )
+    const ok = isScoringSelf
+      ? await submitEmployeeScores(currentUser.id, scores)
+      : await submitManagerScores(currentUser.id, selectedEmployeeId, scores)
     if (ok) setSaved(true)
   }
 
@@ -69,45 +92,43 @@ export function ManagerScoringScreen() {
           <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">
             Your team
           </p>
-          <h2 className="mt-2 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+          <h2 className="mt-2 text-balance text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
             {currentUser.name}
           </h2>
-          <p className="mt-2 text-sm text-muted-foreground">Select employee</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {needsSelfAssessment
+              ? 'Rate yourself, then select an employee'
+              : 'Select employee'}
+          </p>
           <div className="mt-4 space-y-2">
+            {needsSelfAssessment ? (
+              <TeamPersonButton
+                name={currentUser.name}
+                title="Yourself"
+                selected={isScoringSelf}
+                done={Boolean(
+                  assessments.find((a) => a.employeeId === currentUser.id)
+                    ?.employeeScores,
+                )}
+                onSelect={() => setSelectedEmployeeId(currentUser.id)}
+              />
+            ) : null}
             {reports.map((employee) => {
               const record = assessments.find(
                 (a) => a.employeeId === employee.id,
               )
               const done = Boolean(record?.managerScores)
-              const selected = employee.id === selectedEmployeeId
+              const selected =
+                !isScoringSelf && employee.id === selectedEmployeeId
               return (
-                <button
+                <TeamPersonButton
                   key={employee.id}
-                  type="button"
-                  onClick={() => setSelectedEmployeeId(employee.id)}
-                  className={cn(
-                    'flex min-h-11 w-full items-start gap-3 rounded-lg border px-3 py-3 text-left transition',
-                    selected
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border bg-background/70 hover:border-primary/30',
-                  )}
-                >
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <User className="size-4" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{employee.name}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {employee.title}
-                    </p>
-                    <Badge
-                      className="mt-2"
-                      variant={done ? 'default' : 'secondary'}
-                    >
-                      {done ? 'Scored' : 'Pending'}
-                    </Badge>
-                  </div>
-                </button>
+                  name={employee.name}
+                  title={employee.title}
+                  selected={selected}
+                  done={done}
+                  onSelect={() => setSelectedEmployeeId(employee.id)}
+                />
               )
             })}
           </div>
@@ -117,13 +138,17 @@ export function ManagerScoringScreen() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">
-                Manager assessment
+                {isScoringSelf ? 'Self assessment' : 'Manager assessment'}
               </p>
-              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-                {selectedEmployee ? selectedEmployee.name : 'Select an employee'}
+              <h1 className="mt-2 text-balance text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+                {selectedEmployee
+                  ? selectedEmployee.name
+                  : 'Select an employee'}
               </h1>
               <p className="mt-2 text-sm text-muted-foreground">
-                Score this employee on 5 competencies
+                {isScoringSelf
+                  ? 'Score yourself on 5 competencies'
+                  : 'Score this employee on 5 competencies'}
               </p>
             </div>
             <Badge variant={alreadySubmitted ? 'default' : 'secondary'}>
@@ -131,20 +156,27 @@ export function ManagerScoringScreen() {
             </Badge>
           </div>
 
-          {managerAverage != null ? (
+          {scoreAverage != null ? (
             <div className="mt-5 rounded-lg border border-border bg-background/70 px-4 py-3 text-sm">
               <span className="font-semibold tabular-nums text-foreground">
-                Your average: {formatScore(managerAverage)}
+                Your average: {formatScore(scoreAverage)}
               </span>
             </div>
           ) : null}
 
           {selectedEmployee ? (
             <>
+              {!isScoringSelf ? (
+                <div className="mt-6">
+                  <ProficiencyLegend />
+                </div>
+              ) : null}
+
               <div className="mt-6">
                 <ScorePicker
                   scores={scores}
                   disabled={alreadySubmitted}
+                  showProficiencyHints={!isScoringSelf}
                   onChange={(id, value) =>
                     setScores((prev) => setScoreValue(prev, id, value))
                   }
@@ -153,12 +185,16 @@ export function ManagerScoringScreen() {
 
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 <Button size="lg" disabled={!canSubmit} onClick={handleSubmit}>
-                  Submit manager scores
+                  {isScoringSelf
+                    ? 'Submit self scores'
+                    : 'Submit manager scores'}
                 </Button>
                 {alreadySubmitted || saved ? (
                   <p className="inline-flex items-center gap-2 text-sm text-muted-foreground">
                     <CheckCircle2 className="size-4 text-primary" />
-                    Saved for this employee.
+                    {isScoringSelf
+                      ? 'Saved. You can no longer change these scores.'
+                      : 'Saved for this employee.'}
                   </p>
                 ) : (
                   <p className="text-sm text-muted-foreground">
@@ -171,5 +207,43 @@ export function ManagerScoringScreen() {
         </section>
       </div>
     </div>
+  )
+}
+
+function TeamPersonButton({
+  name,
+  title,
+  selected,
+  done,
+  onSelect,
+}: {
+  name: string
+  title: string
+  selected: boolean
+  done: boolean
+  onSelect: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        'flex min-h-11 w-full items-start gap-3 rounded-lg border px-3 py-3 text-left transition-colors',
+        selected
+          ? 'border-primary bg-primary/5'
+          : 'border-border bg-background/70 hover:border-primary/30',
+      )}
+    >
+      <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <User className="size-4" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-medium">{name}</p>
+        <p className="truncate text-xs text-muted-foreground">{title}</p>
+        <Badge className="mt-2" variant={done ? 'default' : 'secondary'}>
+          {done ? 'Scored' : 'Pending'}
+        </Badge>
+      </div>
+    </button>
   )
 }

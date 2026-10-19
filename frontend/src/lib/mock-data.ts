@@ -23,6 +23,25 @@ export function hasAdminAccess(user: MockUser | null | undefined): boolean {
   return user?.role === 'admin' || user?.isAdmin === true
 }
 
+/** Mid-level managers report to someone, so they self-score and score their team. */
+export function canTakeSelfAssessment(
+  user: MockUser | null | undefined,
+): boolean {
+  if (!user) return false
+  switch (user.role) {
+    case 'employee':
+      return true
+    case 'manager':
+      return Boolean(user.reportsTo && user.reportsTo !== user.id)
+    case 'admin':
+      return false
+    default: {
+      const _exhaustive: never = user.role
+      return _exhaustive
+    }
+  }
+}
+
 export type AssessmentRecord = {
   employeeId: string
   managerId: string
@@ -58,12 +77,21 @@ export const MOCK_USERS: MockUser[] = [
     role: 'admin',
   },
   {
+    id: 'dir-1',
+    name: 'Hessa Al Suwaidi',
+    email: 'hessa.director@sobha.com',
+    title: 'Director of Technology',
+    department: 'Technology',
+    role: 'manager',
+  },
+  {
     id: 'mgr-1',
     name: 'Omar Khalid',
     email: 'omar.khalid@sobha.com',
     title: 'Engineering Manager',
     department: 'Technology',
     role: 'manager',
+    reportsTo: 'dir-1',
   },
   {
     id: 'mgr-2',
@@ -123,6 +151,14 @@ export const MOCK_USERS: MockUser[] = [
 export function createInitialAssessments(): AssessmentRecord[] {
   return [
     {
+      employeeId: 'mgr-1',
+      managerId: 'dir-1',
+      employeeScores: null,
+      managerScores: null,
+      employeeSubmittedAt: null,
+      managerSubmittedAt: null,
+    },
+    {
       employeeId: 'emp-1',
       managerId: 'mgr-1',
       employeeScores: scores(4, 4, 5, 3, 4),
@@ -170,9 +206,7 @@ export function getUserById(id: string): MockUser | undefined {
 }
 
 export function getEmployeesForManager(managerId: string): MockUser[] {
-  return MOCK_USERS.filter(
-    (user) => user.role === 'employee' && user.reportsTo === managerId,
-  )
+  return MOCK_USERS.filter((user) => user.reportsTo === managerId)
 }
 
 export function getEmployees(): MockUser[] {
@@ -184,16 +218,14 @@ export function getManagers(): MockUser[] {
 }
 
 export function getDemoAccounts(): MockUser[] {
-  return MOCK_USERS.filter((user) =>
-    user.role === 'admin' || user.role === 'manager' || user.role === 'employee',
-  )
+  return MOCK_USERS
 }
 
-export function cloneScores(scores: ScoreMap | null): ScoreMap {
-  if (!scores) return emptyScores()
+export function cloneScores(source: ScoreMap | null): ScoreMap {
+  if (!source) return emptyScores()
   const next = emptyScores()
   for (const key of Object.keys(next) as CompetencyId[]) {
-    next[key] = scores[key]
+    next[key] = source[key]
   }
   return next
 }

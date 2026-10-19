@@ -77,7 +77,7 @@ function validateEmployeeCode(req, res) {
 router.post("/employee-code", async (req, res) => {
   if (!orgApi.isConfigured) {
     return res.status(503).json({
-      message: "Org directory is not configured on the server.",
+      message: "The employee directory is unavailable. Try again later.",
     });
   }
 
@@ -94,19 +94,19 @@ router.post("/employee-code", async (req, res) => {
 router.post("/microsoft", async (req, res) => {
   if (!azureAuth.isConfigured) {
     return res.status(503).json({
-      message: "Microsoft sign-in is not configured on the server.",
+      message: "Microsoft SSO is not configured.",
     });
   }
   if (!orgApi.isConfigured) {
     return res.status(503).json({
-      message: "Org directory is not configured on the server.",
+      message: "The employee directory is unavailable. Try again later.",
     });
   }
 
   const token = readBearerToken(req);
   if (!token) {
     return res.status(401).json({
-      message: "Authorization Bearer token is required.",
+      message: "Sign in again.",
     });
   }
 

@@ -1,15 +1,19 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState } from 'react'
+import type { SubmitEvent } from 'react'
 import { AuthHeroPanel } from '#/components/AuthHeroPanel'
 import { Badge } from '#/components/ui/badge'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { SHOW_DEMO, USE_API } from '#/lib/config'
-import { getDemoAccounts, type Role } from '#/lib/mock-data'
+import { canTakeSelfAssessment, getDemoAccounts } from '#/lib/mock-data'
+import type { MockUser, Role } from '#/lib/mock-data'
+
 import {
   formatMsalError,
   isMsalConfigured,
   loginWithMicrosoft,
+  MSAL_NOT_CONFIGURED_MESSAGE,
 } from '#/lib/msal-auth'
 import { useCompStore } from '#/store/comp-store'
 import { Shield, User, Users } from 'lucide-react'
@@ -25,7 +29,7 @@ const ROLE_META: Record<
   },
   manager: {
     label: 'Manager',
-    hint: 'Score your team (60% weight)',
+    hint: 'Score your team',
     icon: Users,
   },
   employee: {
@@ -33,6 +37,32 @@ const ROLE_META: Record<
     hint: 'Score yourself (40% weight)',
     icon: User,
   },
+}
+
+function demoRoleLabel(account: MockUser): string {
+  if (account.role === 'manager' && canTakeSelfAssessment(account)) {
+    return 'Mid-level manager'
+  }
+  return ROLE_META[account.role].label
+}
+
+function demoAccountHint(account: MockUser, accounts: MockUser[]): string {
+  switch (account.role) {
+    case 'admin':
+    case 'employee':
+      return ROLE_META[account.role].hint
+    case 'manager': {
+      const boss = accounts.find((person) => person.id === account.reportsTo)
+      if (boss) {
+        return `Reports to ${boss.name}. Score yourself and your team.`
+      }
+      return 'Top-level manager. Score your team only.'
+    }
+    default: {
+      const _exhaustive: never = account.role
+      return _exhaustive
+    }
+  }
 }
 
 export function LoginScreen() {
@@ -59,7 +89,7 @@ export function LoginScreen() {
     }
   }, [loadDemoAccounts])
 
-  const handleEmployeeCodeSubmit = (event: FormEvent) => {
+  const handleEmployeeCodeSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (honeypot.trim()) return
     setAuthError(null)
@@ -69,9 +99,7 @@ export function LoginScreen() {
   const handleMicrosoftLogin = async () => {
     setAuthError(null)
     if (!isMsalConfigured()) {
-      setAuthError(
-        'Microsoft SSO is not configured. Set VITE_MSAL_CLIENT_ID and VITE_MSAL_TENANT_ID, then restart the frontend.',
-      )
+      setAuthError(MSAL_NOT_CONFIGURED_MESSAGE)
       return
     }
 
@@ -139,8 +167,7 @@ export function LoginScreen() {
             </Button>
           ) : USE_API ? (
             <p className="mt-8 text-sm text-muted-foreground">
-              Microsoft SSO is not configured. Set VITE_MSAL_CLIENT_ID and
-              VITE_MSAL_TENANT_ID, then restart the frontend.
+              {MSAL_NOT_CONFIGURED_MESSAGE}
             </p>
           ) : null}
 
@@ -174,8 +201,8 @@ export function LoginScreen() {
                   disabled={busy}
                 />
                 <p className="text-xs text-muted-foreground">
-                  If this code is an L1 manager for others, you score that team.
-                  Otherwise you only rate yourself.
+                  If this code is an L1 manager, you score that team. If you also
+                  report to a manager, you rate yourself too.
                 </p>
               </div>
               <Button
@@ -221,13 +248,15 @@ export function LoginScreen() {
                           <p className="font-semibold text-foreground">
                             {account.name}
                           </p>
-                          <Badge variant="secondary">{meta.label}</Badge>
+                          <Badge variant="secondary">
+                            {demoRoleLabel(account)}
+                          </Badge>
                         </div>
                         <p className="mt-0.5 truncate text-sm text-muted-foreground">
                           {account.title} · {account.department}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          {meta.hint}
+                          {demoAccountHint(account, accounts)}
                         </p>
                       </div>
                     </button>

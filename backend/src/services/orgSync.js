@@ -52,7 +52,12 @@ async function upsertPerson({
     user.name = safeName;
     user.title = safeTitle;
     user.department = safeDepartment;
-    user.role = resolvedRole;
+    const isManagerDowngrade =
+      user.role === USER_ROLES.MANAGER &&
+      resolvedRole === USER_ROLES.EMPLOYEE;
+    if (!isManagerDowngrade) {
+      user.role = resolvedRole;
+    }
     if (!isPlaceholderEmail(safeEmail)) {
       user.email = safeEmail;
     } else if (!user.email) {
@@ -176,10 +181,7 @@ async function persistResolvedIdentity(identity, employees = []) {
     await ensureAssessment(reportUser, upsertedUser);
   }
 
-  if (
-    upsertedUser.role === USER_ROLES.EMPLOYEE &&
-    identity.user.reportsTo
-  ) {
+  if (identity.user.reportsTo) {
     const manager = await findUserByCode(identity.user.reportsTo);
     await ensureAssessment(upsertedUser, manager);
   }

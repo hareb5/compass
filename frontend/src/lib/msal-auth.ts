@@ -49,11 +49,11 @@ async function getMsalInstance() {
   return msalInstancePromise
 }
 
+export const MSAL_NOT_CONFIGURED_MESSAGE = 'Microsoft SSO is not configured.'
+
 function ensureMsalConfigured() {
   if (!isMsalConfigured()) {
-    throw new Error(
-      'Microsoft SSO is not configured. Set VITE_MSAL_CLIENT_ID and VITE_MSAL_TENANT_ID, then rebuild the frontend.',
-    )
+    throw new Error(MSAL_NOT_CONFIGURED_MESSAGE)
   }
 }
 
@@ -61,27 +61,24 @@ export function isMsalConfigured() {
   return clientId.length > 0 && tenantId.length > 0
 }
 
-/** Maps common Azure AD errors to actionable setup hints. */
+/** Maps Microsoft sign-in failures to user-facing copy. */
 export function formatMsalError(error: unknown): string {
   const message =
     error instanceof Error
       ? error.message
       : typeof error === 'string'
         ? error
-        : 'Unknown error'
+        : ''
 
-  if (
-    message.includes('AADSTS9002326') ||
-    message.includes('Single-Page Application')
-  ) {
-    return (
-      'Azure app registration must use platform type "Single-page application" (SPA), not "Web". ' +
-      'In Azure Portal → App registrations → your app → Authentication: add redirect URI ' +
-      `${redirectUri || (typeof window !== 'undefined' ? window.location.origin : '')} under SPA (and remove it from Web if listed there).`
-    )
+  if (message.includes('not configured')) {
+    return MSAL_NOT_CONFIGURED_MESSAGE
   }
 
-  return message
+  if (message.includes('employee ID')) {
+    return message
+  }
+
+  return 'Microsoft sign-in failed. Try again.'
 }
 
 export type MicrosoftRedirectResult = {
@@ -174,7 +171,7 @@ export async function loginWithMicrosoft() {
   ensureMsalConfigured()
   const msalInstance = await getMsalInstance()
   if (!msalInstance) {
-    throw new Error('Microsoft SSO is only available in the browser.')
+    throw new Error('Microsoft sign-in is unavailable.')
   }
 
   await msalInstance.loginRedirect(loginRequest)
@@ -236,7 +233,7 @@ export async function fetchGraphEmployeeId(): Promise<string> {
   const tokens = await acquireMicrosoftTokens()
   if (!tokens.accessToken) {
     throw new Error(
-      'Could not read employee ID from Microsoft. Sign in again.',
+      'Could not read your employee ID from Microsoft. Sign in again.',
     )
   }
 
@@ -246,7 +243,7 @@ export async function fetchGraphEmployeeId(): Promise<string> {
   )
   const payload = await response.json().catch(() => null)
   if (!response.ok) {
-    throw new Error('Could not read employee ID from Microsoft Graph.')
+    throw new Error('Could not read your employee ID from Microsoft. Sign in again.')
   }
 
   const raw = payload && typeof payload === 'object' ? payload.employeeId : null

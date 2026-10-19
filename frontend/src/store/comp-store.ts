@@ -1,13 +1,13 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import {
+  canTakeSelfAssessment,
   cloneScores,
   createInitialAssessments,
   getEmployeesForManager,
   getUserById as getMockUserById,
-  type AssessmentRecord,
-  type MockUser,
 } from '#/lib/mock-data'
+import type { AssessmentRecord, MockUser } from '#/lib/mock-data'
 import type { CompetencyId, ScoreMap } from '#/lib/competencies'
 import { isCompleteScores } from '#/lib/competencies'
 import { DEMO_USER_KEY, ORG_EMPLOYEE_CODE_KEY, SHOW_DEMO, USE_API } from '#/lib/config'
@@ -30,9 +30,8 @@ import {
   resetAdminData,
   submitManagerScores as apiSubmitManagerScores,
   submitSelfScores as apiSubmitSelfScores,
-  type AdminAssessmentRow,
-  type MeResponse,
 } from '#/lib/comp-api'
+import type { AdminAssessmentRow, MeResponse } from '#/lib/comp-api'
 import {
   establishSessionFromEmployeeCode,
   establishSessionFromMicrosoft,
@@ -137,7 +136,9 @@ async function buildApiWorkspace(me: MeResponse): Promise<Partial<CompState>> {
     }
     case 'manager': {
       const mine = await fetchMyAssessments()
-      next.assessments = mine.assessments ?? []
+      const ownAssessment = mine.assessment ? [mine.assessment] : []
+      const teamAssessments = mine.assessments ?? []
+      next.assessments = [...ownAssessment, ...teamAssessments]
       next.reports = mine.reports ?? reports
       next.usersById = indexUsers([me, ...(mine.reports ?? reports)])
       break
@@ -300,7 +301,19 @@ export const useCompStore = create<CompState>()(
         }
 
         const orgCode = getOrgEmployeeCode()
-        if (!orgCode) return
+        if (!orgCode) {
+          const user = get().currentUser
+          if (!user) return
+          const fresh = getMockUserById(user.id) ?? user
+          const reports =
+            fresh.role === 'manager' ? getEmployeesForManager(fresh.id) : []
+          set({
+            currentUser: fresh,
+            reports,
+            usersById: indexUsers([fresh, ...reports]),
+          })
+          return
+        }
 
         set({ isLoading: true, error: null })
         try {
@@ -427,7 +440,13 @@ export const useCompStore = create<CompState>()(
       submitEmployeeScores: async (employeeId, scores) => {
         if (!isCompleteScores(scores)) return false
         const { currentUser, useApi, sessionKind } = get()
-        if (!currentUser || currentUser.id !== employeeId) return false
+        if (
+          !currentUser ||
+          currentUser.id !== employeeId ||
+          !canTakeSelfAssessment(currentUser)
+        ) {
+          return false
+        }
 
         if (usesLocalScoring(sessionKind, useApi)) {
           const { assessments } = get()
@@ -592,11 +611,8 @@ export const useCompStore = create<CompState>()(
       getAssessment: (employeeId) =>
         get().assessments.find((record) => record.employeeId === employeeId),
 
-      getUser: (userId) => {
-        const fromStore = get().usersById[userId]
-        if (fromStore) return fromStore
-        return getMockUserById(userId)
-      },
+      getUser: (userId) =>
+        get().usersById[userId] ?? getMockUserById(userId),
     }),
     {
       name: USE_API ? 'comptool-api-v1' : 'comptool-mock-v1',

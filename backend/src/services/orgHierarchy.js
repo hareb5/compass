@@ -1,4 +1,5 @@
 const CompUser = require("../models/CompUser");
+const { USER_ROLES } = require("../constants/userRoles");
 
 function serializeUser(user) {
   if (!user) return null;
@@ -17,6 +18,22 @@ function serializeUser(user) {
     role: user.role,
     reportsTo: managerExternalId,
   };
+}
+
+function canSubmitSelfScores(user) {
+  if (!user) return false;
+  switch (user.role) {
+    case USER_ROLES.EMPLOYEE:
+      return true;
+    case USER_ROLES.MANAGER:
+      return Boolean(user.managerRef);
+    case USER_ROLES.ADMIN:
+      return false;
+    default: {
+      const _exhaustive = user.role;
+      throw new Error(`Unhandled role: ${_exhaustive}`);
+    }
+  }
 }
 
 async function getManagerFor(employeeRef) {
@@ -52,6 +69,7 @@ async function syncFromExternal(_payload) {
 
 module.exports = {
   serializeUser,
+  canSubmitSelfScores,
   getManagerFor,
   getManagerForExternalId,
   getReportsFor,

@@ -44,9 +44,40 @@ function toPerson(
   }
 }
 
+function hasActiveReports(employees: OrgEmployee[], code: string): boolean {
+  return employees.some(
+    (row) =>
+      normalizeCode(row.L1_MANAGER_CODE) === code && isActiveEmployee(row),
+  )
+}
+
+function ownManagerCode(
+  selfRow: OrgEmployee | undefined,
+  code: string,
+): string | undefined {
+  const managerCode = normalizeCode(selfRow?.L1_MANAGER_CODE)
+  if (!managerCode || managerCode === code) return undefined
+  return managerCode
+}
+
+function emptyAssessment(
+  employeeId: string,
+  managerId: string,
+): AssessmentRecord {
+  return {
+    employeeId,
+    managerId,
+    employeeScores: null,
+    managerScores: null,
+    employeeSubmittedAt: null,
+    managerSubmittedAt: null,
+  }
+}
+
 /**
  * Resolve role from an employee code against the org directory.
  * - Appears as anyone's L1_MANAGER_CODE (active reports) → manager
+ * - Manager who also has an L1 manager → self-score plus team scoring
  * - Otherwise → employee (self-score only)
  *
  * Same entry point SSO will call once it provides the employee code.
@@ -74,23 +105,21 @@ export function resolveOrgIdentity(
       normalizeCode(selfRow?.EMPLOYEE_NAME) ||
       normalizeCode(reportRows[0]?.L1_MANAGER_NAME) ||
       code
-    const user = toPerson(code, managerName, 'manager')
-    const reports = reportRows.map((row) =>
-      toPerson(
-        normalizeCode(row.EMPLOYEE_CODE),
+    const reportsTo = ownManagerCode(selfRow, code)
+    const user = toPerson(code, managerName, 'manager', reportsTo)
+    const reports = reportRows.map((row) => {
+      const reportCode = normalizeCode(row.EMPLOYEE_CODE)
+      return toPerson(
+        reportCode,
         normalizeCode(row.EMPLOYEE_NAME),
-        'employee',
+        hasActiveReports(employees, reportCode) ? 'manager' : 'employee',
         code,
-      ),
-    )
-    const assessments: AssessmentRecord[] = reports.map((report) => ({
-      employeeId: report.id,
-      managerId: code,
-      employeeScores: null,
-      managerScores: null,
-      employeeSubmittedAt: null,
-      managerSubmittedAt: null,
-    }))
+      )
+    })
+    const assessments: AssessmentRecord[] = [
+      ...(reportsTo ? [emptyAssessment(code, reportsTo)] : []),
+      ...reports.map((report) => emptyAssessment(report.id, code)),
+    ]
     return { user, reports, assessments }
   }
 
@@ -98,23 +127,16 @@ export function resolveOrgIdentity(
     throw new Error(`Employee code "${code}" was not found in the directory.`)
   }
 
-  const managerCode = normalizeCode(selfRow.L1_MANAGER_CODE)
+  const managerCode = ownManagerCode(selfRow, code)
   const user = toPerson(
     code,
     normalizeCode(selfRow.EMPLOYEE_NAME),
     'employee',
-    managerCode || undefined,
+    managerCode,
   )
-  const assessments: AssessmentRecord[] = [
-    {
-      employeeId: code,
-      managerId: managerCode,
-      employeeScores: null,
-      managerScores: null,
-      employeeSubmittedAt: null,
-      managerSubmittedAt: null,
-    },
-  ]
+  const assessments: AssessmentRecord[] = managerCode
+    ? [emptyAssessment(code, managerCode)]
+    : [emptyAssessment(code, '')]
   return { user, reports: [], assessments }
 }
 
@@ -129,7 +151,7 @@ function parseEmployeesPayload(payload: unknown): OrgEmployee[] {
   ) {
     return (payload as { employees: OrgEmployee[] }).employees
   }
-  throw new Error('Org API response missing an "employees" array.')
+  throw new Error('The employee directory returned an unexpected response.')
 }
 
 /**
@@ -139,13 +161,13 @@ function parseEmployeesPayload(payload: unknown): OrgEmployee[] {
 async function fetchOrgEmployeesViaProxy(): Promise<OrgEmployee[]> {
   const response = await fetch('/org-api/employees')
   if (!response.ok) {
-    throw new Error(`Org API failed (${response.status})`)
+    throw new Error('The employee directory is unavailable. Try again shortly.')
   }
 
   const payload = await response.json().catch(() => null)
   if (payload == null) {
     throw new Error(
-      'Could not reach the org directory. Check ORG_API_URL on the server and restart.',
+      'Could not reach the employee directory. Try again shortly.',
     )
   }
 
